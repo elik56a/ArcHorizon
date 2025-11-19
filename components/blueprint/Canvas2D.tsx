@@ -13,11 +13,12 @@ interface Canvas2DProps {
   pan: { x: number, y: number };
   scale: number;
   rotation: number;
-  onMouseDown: (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number) => void;
+  onMouseDown: (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => void;
   onMouseMove: (e: React.MouseEvent) => void;
   onMouseUp: () => void;
   onWheel: (e: React.WheelEvent) => void;
   bounds: { minX: number, maxX: number, minY: number, maxY: number };
+  selectedId?: string;
 }
 
 const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, value: number, offset?: number}> = ({ x1, y1, x2, y2, value, offset = 20 }) => {
@@ -46,9 +47,71 @@ const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, v
     );
 };
 
+interface ResizeHandlesProps {
+    width: number;
+    height: number;
+    rotation: number;
+    onResizeStart: (e: React.MouseEvent, handle: string) => void;
+    scale: number;
+}
+
+const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, rotation, onResizeStart, scale }) => {
+    const handleSize = 8 / scale; // Keep constant visual size
+    const offset = handleSize / 2;
+    
+    // Standard cursor sequence (0 deg = North)
+    const cursors = ['n-resize', 'ne-resize', 'e-resize', 'se-resize', 's-resize', 'sw-resize', 'w-resize', 'nw-resize'];
+    
+    // Helper to get rotated cursor
+    const getCursor = (baseIndex: number) => {
+        // Add element rotation to base handle direction
+        // Map 0-360 to 0-7 index
+        const rotSteps = Math.round(rotation / 45);
+        const index = (baseIndex + rotSteps + 8) % 8;
+        return cursors[index];
+    };
+
+    // Handles Definition: [x, y, baseIndex (0=N, 1=NE...), name]
+    const handles = [
+        [width/2, 0, 0, 'n'],
+        [width, 0, 1, 'ne'],
+        [width, height/2, 2, 'e'],
+        [width, height, 3, 'se'],
+        [width/2, height, 4, 's'],
+        [0, height, 5, 'sw'],
+        [0, height/2, 6, 'w'],
+        [0, 0, 7, 'nw']
+    ] as const;
+
+    return (
+        <g>
+            {/* Bounding Box Outline */}
+            <rect x={0} y={0} width={width} height={height} fill="none" stroke="#3b82f6" strokeWidth={1/scale} strokeDasharray={`${4/scale},${4/scale}`} pointerEvents="none"/>
+            
+            {handles.map(([x, y, baseIdx, name]) => (
+                <rect 
+                    key={name}
+                    x={x - offset}
+                    y={y - offset}
+                    width={handleSize}
+                    height={handleSize}
+                    fill="white"
+                    stroke="#3b82f6"
+                    strokeWidth={1.5/scale}
+                    style={{ cursor: getCursor(baseIdx) }}
+                    onMouseDown={(e) => {
+                        e.stopPropagation();
+                        onResizeStart(e, name);
+                    }}
+                />
+            ))}
+        </g>
+    );
+};
+
 const Canvas2D: React.FC<Canvas2DProps> = ({
   svgRef, data, activeFloor, pan, scale, rotation, 
-  onMouseDown, onMouseMove, onMouseUp, onWheel, bounds
+  onMouseDown, onMouseMove, onMouseUp, onWheel, bounds, selectedId
 }) => {
   
   const visibleRooms = data.rooms.filter(r => r.floor === activeFloor);
@@ -94,6 +157,8 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
             {visibleRooms.map((room) => {
                const isWetArea = ['bathroom', 'kitchen', 'balcony'].includes(room.type);
                const isLiving = ['living', 'bedroom', 'dining'].includes(room.type);
+               const isSelected = room.id === selectedId;
+               const defaultFill = isWetArea ? "url(#tiles)" : isLiving ? "url(#wood)" : "none";
                
                return (
                 <g
@@ -106,15 +171,16 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     width={room.width}
                     height={room.height}
                     fill="white" 
-                    stroke="black"
+                    stroke={isSelected ? "#3b82f6" : "black"}
                     strokeWidth={WALL_STROKE_WIDTH}
-                    className="shadow-sm"
+                    className={isSelected ? "shadow-lg" : "shadow-sm"}
                   />
                   <rect 
                      x={WALL_STROKE_WIDTH/2} y={WALL_STROKE_WIDTH/2}
                      width={room.width - WALL_STROKE_WIDTH}
                      height={room.height - WALL_STROKE_WIDTH}
-                     fill={isWetArea ? "url(#tiles)" : isLiving ? "url(#wood)" : "none"}
+                     fill={room.color || defaultFill}
+                     opacity={room.opacity ?? 1}
                      pointerEvents="none"
                   />
                   <text x={room.width/2} y={room.height/2} textAnchor="middle" className="font-mono text-sm font-bold fill-black pointer-events-none select-none tracking-widest">
@@ -123,6 +189,15 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                   <text x={room.width/2} y={room.height/2 + 15} textAnchor="middle" className="font-mono text-[10px] fill-gray-500 pointer-events-none select-none">
                     {Math.round((room.width * room.height) / 10000)}m²
                   </text>
+                  {isSelected && (
+                    <ResizeHandles 
+                        width={room.width} 
+                        height={room.height} 
+                        rotation={0} 
+                        scale={scale}
+                        onResizeStart={(e, handle) => onMouseDown(e, room.id, 'room', undefined, undefined, handle)}
+                    />
+                  )}
                 </g>
             )})}
 
@@ -130,19 +205,24 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
             {visibleElements.map((el) => {
                const isOpening = ['door', 'window', 'entry_door'].includes(el.type);
                const clipProp = (el.roomId && !isOpening) ? { clipPath: `url(#clip-${el.roomId})` } : {};
+               const isSelected = el.id === selectedId;
                
                const render2DShape = () => {
+                  const fill = el.color || (isOpening ? "white" : "white");
+                  const stroke = isSelected ? "#3b82f6" : "black";
+                  const strokeWidth = isSelected ? 3 : 1;
+
                   switch(el.type) {
                      case 'door': case 'entry_door':
-                        return <g><rect x="-5" y="-5" width={el.width+10} height={el.height+10} fill="white"/><path d={`M 0 ${el.height} A ${el.width} ${el.width} 0 0 1 ${el.width} 0`} fill="none" stroke="black" strokeDasharray="5,3"/><line x1="0" y1={el.height} x2={el.width} y2={0} stroke="black" strokeWidth="2"/></g>;
+                        return <g><rect x="-5" y="-5" width={el.width+10} height={el.height+10} fill={fill} opacity={el.opacity ?? 1}/><path d={`M 0 ${el.height} A ${el.width} ${el.width} 0 0 1 ${el.width} 0`} fill="none" stroke={stroke} strokeDasharray="5,3"/><line x1="0" y1={el.height} x2={el.width} y2={0} stroke={stroke} strokeWidth="2"/></g>;
                      case 'window':
                         return <g>
                             <rect x="-2" y="-2" width={el.width+4} height={el.height+4} fill="white"/>
-                            <rect width={el.width} height={el.height} fill="#e0f7fa" stroke="black" strokeWidth="2"/>
-                            <line x1="0" y1={el.height/2} x2={el.width} y2={el.height/2} stroke="black"/>
+                            <rect width={el.width} height={el.height} fill={el.color || "#e0f7fa"} stroke={stroke} strokeWidth="2" opacity={el.opacity ?? 1}/>
+                            <line x1="0" y1={el.height/2} x2={el.width} y2={el.height/2} stroke={stroke}/>
                         </g>;
                      default:
-                        return <rect width={el.width} height={el.height} fill="white" stroke="black" />;
+                        return <rect width={el.width} height={el.height} fill={fill} stroke={stroke} strokeWidth={strokeWidth} opacity={el.opacity ?? 1} />;
                   }
                }
 
@@ -155,6 +235,15 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     {...clipProp}
                   >
                       {render2DShape()}
+                      {isSelected && (
+                        <ResizeHandles 
+                            width={el.width} 
+                            height={el.height} 
+                            rotation={el.rotation} 
+                            scale={scale}
+                            onResizeStart={(e, handle) => onMouseDown(e, el.id, 'element', undefined, undefined, handle)}
+                        />
+                      )}
                   </g>
                );
             })}

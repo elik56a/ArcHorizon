@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon, GripHorizontal } from 'lucide-react';
 import { SketchData } from '../../types';
 
 // --- HELPER: TOOLTIP BUTTON ---
@@ -88,7 +88,7 @@ export const FloorSelector: React.FC<{
     if (totalFloors <= 1) return null;
 
     return (
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 z-30 flex flex-col gap-2">
+        <div className="absolute left-6 top-32 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 z-30 flex flex-col gap-2">
            <Layers size={16} className="mx-auto mb-1 text-gray-400"/>
            {Array.from({length: totalFloors}, (_, i) => totalFloors - i).map(floor => (
               <button 
@@ -117,13 +117,31 @@ interface ToolbarProps {
         canUndo: boolean;
         canRedo: boolean;
     } | undefined;
+    position?: { x: number, y: number } | null;
+    onDragStart?: (e: React.MouseEvent) => void;
 }
 
 export const ViewportToolbar: React.FC<ToolbarProps> = ({ 
-    viewMode, setViewMode, scale, setScale, rotateCanvas, onFit, history 
+    viewMode, setViewMode, scale, setScale, rotateCanvas, onFit, history, position, onDragStart
 }) => {
+    const style = position 
+        ? { left: position.x, top: position.y, transform: 'none' } 
+        : { bottom: '2rem', left: '50%', transform: 'translateX(-50%)' };
+
     return (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-4 py-2 flex items-center gap-4 z-30 rounded-none">
+        <div 
+            className="absolute bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-3 py-2 flex items-center gap-3 z-30 rounded-none viewport-toolbar select-none"
+            style={style}
+        >
+             {/* Drag Handle */}
+             <div 
+               className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+               onMouseDown={onDragStart}
+             >
+                <GripHorizontal size={20} />
+             </div>
+             <div className="w-px h-6 bg-gray-300"></div>
+
              <div className="flex bg-gray-100 p-1 rounded border border-gray-300">
                 <button 
                   onClick={() => setViewMode('2d')}
@@ -139,7 +157,7 @@ export const ViewportToolbar: React.FC<ToolbarProps> = ({
                 </button>
              </div>
              
-             <div className="w-px h-4 bg-gray-300"></div>
+             <div className="w-px h-6 bg-gray-300"></div>
 
              {viewMode === '2d' && (
                <>
@@ -148,7 +166,7 @@ export const ViewportToolbar: React.FC<ToolbarProps> = ({
                     <span className="font-mono text-xs w-10 text-center select-none text-gray-500">{Math.round(scale * 100)}%</span>
                     <TooltipButton onClick={() => setScale(s => s * 1.1)} icon={ZoomIn} label="Zoom In" />
                 </div>
-                <div className="w-px h-4 bg-gray-300"></div>
+                <div className="w-px h-6 bg-gray-300"></div>
                 <div className="flex gap-2 items-center">
                     <TooltipButton onClick={() => rotateCanvas('ccw')} icon={RotateCcw} label="Rotate Left 90°" />
                     <TooltipButton onClick={() => rotateCanvas('cw')} icon={RotateCw} label="Rotate Right 90°" />
@@ -156,9 +174,9 @@ export const ViewportToolbar: React.FC<ToolbarProps> = ({
                </>
              )}
              
-             <div className="w-px h-4 bg-gray-300"></div>
+             <div className="w-px h-6 bg-gray-300"></div>
              <TooltipButton onClick={onFit} icon={Maximize} label="Fit to Screen" />
-             <div className="w-px h-4 bg-gray-300"></div>
+             <div className="w-px h-6 bg-gray-300"></div>
              {history && (
                <>
                  <TooltipButton onClick={history.undo} disabled={!history.canUndo} icon={Undo} label="Undo Change" />

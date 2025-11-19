@@ -16,6 +16,8 @@ export interface Room {
   type: RoomType;
   floor: number; // 1-based index (1 = Ground, 2 = 1st floor, etc.)
   floorFinish?: 'tiled' | 'wood' | 'carpet' | 'concrete';
+  color?: string;
+  opacity?: number;
 }
 
 export interface Connection {
@@ -52,6 +54,8 @@ export interface ArchitecturalElement {
   height: number;
   rotation: number; // 0, 90, 180, 270
   floor: number;
+  color?: string;
+  opacity?: number;
 }
 
 export interface SketchData {

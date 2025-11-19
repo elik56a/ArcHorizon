@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SketchData, Room } from '../types';
+import { SketchData, Room, ArchitecturalElement } from '../types';
 import { downloadDXF, downloadPDF, downloadSVG } from '../services/exportService';
-import { Loader2, PenTool } from 'lucide-react';
+import { Loader2, PenTool, Compass, Ruler, Box, Layers } from 'lucide-react';
 import Canvas3D from './blueprint/Canvas3D';
 import Canvas2D from './blueprint/Canvas2D';
 import { ViewportHeader, ViewportToolbar, FloorSelector } from './blueprint/BlueprintControls';
@@ -17,9 +17,74 @@ interface BlueprintCanvasProps {
     canUndo: boolean;
     canRedo: boolean;
   }
+  selectedId?: string;
+  onSelect?: (id: string | null, type?: 'room' | 'element') => void;
 }
 
-const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUpdate, historyControl }) => {
+// Types for Dragging
+interface DragState {
+    id: string;
+    type: 'room' | 'element';
+    startX: number; // Mouse start X
+    startY: number; // Mouse start Y
+    initialX: number; // Element start X
+    initialY: number; // Element start Y
+}
+
+interface ResizeState {
+    id: string;
+    type: 'room' | 'element';
+    handle: string; // n, s, e, w, ne, nw, se, sw
+    startMouseX: number; // Model coordinates
+    startMouseY: number;
+    initialMsg: { x: number, y: number, width: number, height: number, rotation: number };
+}
+
+// --- 1. CLEANER LOADER COMPONENT ---
+const LOADING_STEPS = [
+  "Analyzing Architecture...",
+  "Optimizing Floor Layout...",
+  "Calculating Structure...",
+  "Placing Elements..."
+];
+
+const LoadingOverlay: React.FC = () => {
+    const [step, setStep] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setStep((prev) => (prev + 1) % LOADING_STEPS.length);
+        }, 3000); // SLOWER: 3 seconds per text
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center select-none transition-all duration-500">
+            <div className="flex flex-col items-center gap-6">
+                {/* Clean Minimalist Spinner */}
+                <div className="relative">
+                    <div className="w-16 h-16 border-[3px] border-gray-100 rounded-full"></div>
+                    <div className="absolute top-0 left-0 w-16 h-16 border-[3px] border-black border-t-transparent rounded-full animate-spin"></div>
+                    <Compass className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-black/20" strokeWidth={1.5}/>
+                </div>
+                
+                {/* Clean Typography */}
+                <div className="text-center space-y-2">
+                    <h3 className="text-lg font-bold text-gray-900 tracking-tight font-sans">GENERATING BLUEPRINT</h3>
+                    <div key={step} className="h-6 animate-in slide-in-from-bottom-2 fade-in duration-700">
+                        <p className="text-xs font-mono text-gray-500 uppercase tracking-widest">
+                             {LOADING_STEPS[step]}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ 
+    data, isLoading, onUpdate, historyControl, selectedId, onSelect 
+}) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -32,19 +97,24 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 50, y: 50 });
   
-  // Dragging State
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [draggingType, setDraggingType] = useState<'room' | 'element' | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  // Interaction State
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null);
+  const [hasMoved, setHasMoved] = useState(false);
 
-  // Update local data when prop changes, unless dragging
+  // Toolbar Drag State
+  const [toolbarPos, setToolbarPos] = useState<{x: number, y: number} | null>(null);
+  const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
+  const [toolbarDragOffset, setToolbarDragOffset] = useState({x: 0, y: 0});
+
+  // Update local data when prop changes, unless interacting
   useEffect(() => {
-    if (!draggingId) {
+    if (!dragState && !resizeState) {
         setLocalData(data);
     }
-  }, [data, draggingId]);
+  }, [data, dragState, resizeState]);
 
   // Reset view when loading new project
   useEffect(() => {
@@ -53,7 +123,6 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
         const minFloor = Math.min(...floors);
         setActiveFloor(minFloor);
         setTimeout(() => fitToScreen(minFloor), 100);
-        console.log("Data loaded:", data.title);
     }
   }, [data?.id]);
 
@@ -100,14 +169,11 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
     if (!containerRef.current || !localData) return;
     
     const visibleRooms = localData.rooms.filter(r => r.floor === activeFloor);
-    
     let cx = 0, cy = 0;
     if (visibleRooms.length > 0) {
         const bounds = getBounds(visibleRooms);
         cx = (bounds.minX + bounds.maxX) / 2;
         cy = (bounds.minY + bounds.maxY) / 2;
-    } else {
-        cx = 500; cy = 500;
     }
 
     const containerW = containerRef.current.clientWidth;
@@ -158,42 +224,157 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number) => {
+  const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
     if (viewMode === '3d') return;
     e.stopPropagation();
+    setHasMoved(false);
 
-    if (id && type && x !== undefined && y !== undefined) {
-      setDraggingId(id);
-      setDraggingType(type);
-      const modelPos = getModelCoordinates(e.clientX, e.clientY);
-      setDragOffset({
-        x: modelPos.x - x,
-        y: modelPos.y - y
-      });
+    const modelPos = getModelCoordinates(e.clientX, e.clientY);
+
+    if (resizeHandle && id && type && localData) {
+        // RESIZE START
+        const item = type === 'room' 
+            ? localData.rooms.find(r => r.id === id) 
+            : localData.elements.find(el => el.id === id);
+        
+        if (item) {
+            setResizeState({
+                id, type, handle: resizeHandle,
+                startMouseX: modelPos.x, startMouseY: modelPos.y,
+                initialMsg: { 
+                    x: item.x, y: item.y, width: item.width, height: item.height, 
+                    // @ts-ignore
+                    rotation: item.rotation || 0 
+                }
+            });
+        }
+    } else if (id && type && x !== undefined && y !== undefined) {
+        // DRAG START
+        setDragState({
+            id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y
+        });
     } else {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        // PAN START
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        if (onSelect) onSelect(null);
     }
   };
 
+  // --- TOOLBAR DRAG HANDLERS ---
+  const handleToolbarDragStart = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDraggingToolbar(true);
+      // Calculate offset from the mouse to the toolbar's top-left corner
+      const rect = (e.currentTarget.closest('.viewport-toolbar') as HTMLElement).getBoundingClientRect();
+      setToolbarDragOffset({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+      });
+  };
+
+  const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDraggingToolbar && containerRef.current) {
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const x = e.clientX - containerRect.left - toolbarDragOffset.x;
+          const y = e.clientY - containerRect.top - toolbarDragOffset.y;
+          setToolbarPos({ x, y });
+          return; // Don't do other canvas moves
+      }
+  };
+
+  const handleGlobalMouseUp = () => {
+      setIsDraggingToolbar(false);
+  };
+
+  useEffect(() => {
+      if (isDraggingToolbar) {
+          window.addEventListener('mousemove', handleGlobalMouseMove);
+          window.addEventListener('mouseup', handleGlobalMouseUp);
+      } else {
+          window.removeEventListener('mousemove', handleGlobalMouseMove);
+          window.removeEventListener('mouseup', handleGlobalMouseUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleGlobalMouseMove);
+          window.removeEventListener('mouseup', handleGlobalMouseUp);
+      }
+  }, [isDraggingToolbar]);
+
+
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (viewMode === '3d') return;
+    if (viewMode === '3d' || isDraggingToolbar) return;
+    setHasMoved(true);
     
-    if (draggingId && localData) {
-      const modelPos = getModelCoordinates(e.clientX, e.clientY);
-      const newX = modelPos.x - dragOffset.x;
-      const newY = modelPos.y - dragOffset.y;
+    const modelPos = getModelCoordinates(e.clientX, e.clientY);
+
+    if (resizeState && localData) {
+        // --- RESIZE LOGIC ---
+        const { startMouseX, startMouseY, initialMsg, handle } = resizeState;
+        const dx = modelPos.x - startMouseX;
+        const dy = modelPos.y - startMouseY;
+
+        const rad = -initialMsg.rotation * (Math.PI / 180);
+        const localDx = dx * Math.cos(rad) - dy * Math.sin(rad);
+        const localDy = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+        let newW = initialMsg.width;
+        let newH = initialMsg.height;
+        let deltaCx = 0; 
+        let deltaCy = 0; 
+
+        if (handle.includes('e')) { newW += localDx; deltaCx = localDx / 2; } 
+        else if (handle.includes('w')) { newW -= localDx; deltaCx = localDx / 2; }
+
+        if (handle.includes('s')) { newH += localDy; deltaCy = localDy / 2; } 
+        else if (handle.includes('n')) { newH -= localDy; deltaCy = localDy / 2; }
+
+        if (newW < 10) { newW = 10; deltaCx = 0; }
+        if (newH < 10) { newH = 10; deltaCy = 0; }
+
+        const worldShiftX = deltaCx * Math.cos(-rad) - deltaCy * Math.sin(-rad);
+        const worldShiftY = deltaCx * Math.sin(-rad) + deltaCy * Math.cos(-rad);
+
+        const oldCx = initialMsg.x + initialMsg.width / 2;
+        const oldCy = initialMsg.y + initialMsg.height / 2;
+        const newCx = oldCx + worldShiftX;
+        const newCy = oldCy + worldShiftY;
+
+        const newX = newCx - newW / 2;
+        const newY = newCy - newH / 2;
+
+        if (resizeState.type === 'room') {
+            const updatedRooms = localData.rooms.map(r => 
+                r.id === resizeState.id ? { ...r, x: newX, y: newY, width: newW, height: newH } : r
+            );
+            setLocalData({ ...localData, rooms: updatedRooms });
+        } else {
+            const updatedElements = localData.elements.map(el => 
+                el.id === resizeState.id ? { ...el, x: newX, y: newY, width: newW, height: newH } : el
+            );
+            setLocalData({ ...localData, elements: updatedElements });
+        }
+
+    } else if (dragState && localData) {
+      // --- DRAG LOGIC ---
+      const dx = modelPos.x - dragState.startX;
+      const dy = modelPos.y - dragState.startY;
+      
+      const newX = dragState.initialX + dx;
+      const newY = dragState.initialY + dy;
+      
       const snappedX = Math.round(newX / 10) * 10; 
       const snappedY = Math.round(newY / 10) * 10;
 
-      if (draggingType === 'room') {
+      if (dragState.type === 'room') {
          const updatedRooms = localData.rooms.map(r => 
-          r.id === draggingId ? { ...r, x: snappedX, y: snappedY } : r
+          r.id === dragState.id ? { ...r, x: snappedX, y: snappedY } : r
         );
         setLocalData({ ...localData, rooms: updatedRooms });
-      } else if (draggingType === 'element') {
+      } else if (dragState.type === 'element') {
         const updatedElements = localData.elements.map(el => 
-          el.id === draggingId ? { ...el, x: snappedX, y: snappedY } : el
+          el.id === dragState.id ? { ...el, x: snappedX, y: snappedY } : el
         );
         setLocalData({ ...localData, elements: updatedElements });
       }
@@ -203,11 +384,14 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
   };
 
   const handleMouseUp = () => {
-    if (draggingId && localData) {
+    if (!hasMoved && !resizeState && dragState && onSelect) {
+        onSelect(dragState.id, dragState.type);
+    } else if (hasMoved && (dragState || resizeState) && localData) {
         onUpdate(localData);
+        if (dragState && onSelect) onSelect(dragState.id, dragState.type);
     }
-    setDraggingId(null);
-    setDraggingType(null);
+    setDragState(null);
+    setResizeState(null);
     setIsPanning(false);
   };
 
@@ -222,19 +406,7 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
   // --- RENDERS ---
 
   if (isLoading) {
-      return (
-          <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-50">
-              <div className="relative mb-6">
-                 <div className="absolute inset-0 bg-black rounded-full animate-ping opacity-10" style={{ animationDuration: '2s' }}></div>
-                 <div className="relative bg-white p-6 rounded-full shadow-2xl border-4 border-black">
-                     <Loader2 className="w-12 h-12 animate-spin text-black" />
-                 </div>
-              </div>
-              <h2 className="text-2xl font-bold text-black tracking-tighter mb-1 uppercase">ArcHorizon</h2>
-              <div className="w-32 h-1 bg-black mx-auto mb-2"></div>
-              <p className="font-mono text-xs tracking-widest uppercase text-gray-500 animate-pulse">Generating Layout...</p>
-          </div>
-      );
+      return <LoadingOverlay />;
   }
 
   if (!localData) {
@@ -275,10 +447,16 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
         rotateCanvas={rotateCanvas}
         onFit={() => fitToScreen()}
         history={historyControl}
+        position={toolbarPos} // PASS POSITION
+        onDragStart={handleToolbarDragStart} // PASS DRAG HANDLER
       />
 
       {viewMode === '3d' ? (
-        <Canvas3D data={localData} activeFloor={activeFloor} />
+        <Canvas3D 
+            data={localData} 
+            activeFloor={activeFloor} 
+            onUpdate={onUpdate} 
+        />
       ) : (
         <Canvas2D 
            svgRef={svgRef}
@@ -292,6 +470,7 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
            onMouseMove={handleMouseMove}
            onMouseUp={handleMouseUp}
            onWheel={handleWheel}
+           selectedId={selectedId}
         />
       )}
     </div>
