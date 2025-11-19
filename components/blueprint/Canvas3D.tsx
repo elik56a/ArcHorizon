@@ -1,7 +1,7 @@
 
 import React, { useEffect, Suspense, useRef, useState } from 'react';
 import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid as Grid3D, Environment, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, Grid as Grid3D, Environment, ContactShadows, Html, Edges } from '@react-three/drei';
 import { SketchData, Room, ArchitecturalElement } from '../../types';
 import * as THREE from 'three';
 
@@ -25,10 +25,12 @@ declare global {
 const WALL_HEIGHT = 280; // cm
 const WALL_THICKNESS = 15; // cm
 const OPENING_THICKNESS = 22; // cm
+const FLOOR_PITCH = 300; // cm (Height difference between floors)
 
 interface Canvas3DProps {
   data: SketchData;
   activeFloor: number;
+  showAllFloors?: boolean;
   onUpdate?: (data: SketchData) => void;
   cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
 }
@@ -39,22 +41,24 @@ interface Element3DProps {
     element: ArchitecturalElement;
     onPointerDown: (e: ThreeEvent<PointerEvent>, id: string) => void;
     elementRefs: React.MutableRefObject<{[key: string]: THREE.Group}>;
+    yOffset: number;
 }
 
-const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRefs }) => {
+const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRefs, yOffset }) => {
   const { x, y, width, height, rotation, type, color, id } = element;
   const px = x + width / 2;
   const pz = y + height / 2;
   const rotY = -rotation * (Math.PI / 180);
 
   const materialProps = { color: color || '#ffffff', roughness: 0.5 };
+  const baseY = 30 + yOffset;
 
   // --- LONG PRESS LOGIC ---
   const timerRef = useRef<any>(null);
   const startPosRef = useRef<{x: number, y: number} | null>(null);
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-      // We do NOT call stopPropagation here to allow OrbitControls to work initially.
+      // Don't stop propagation yet - allow orbit controls to potentially start
       startPosRef.current = { x: e.clientX, y: e.clientY };
 
       // Start Long Press Timer (500ms)
@@ -67,7 +71,6 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   };
 
   const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
-      // Cancel long press if released early (Click)
       if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
@@ -101,18 +104,22 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
               <mesh castShadow receiveShadow position={[0, 0, 0]}>
                 <boxGeometry args={[width, 40, height]} />
                 <meshStandardMaterial {...materialProps} color={color || "#f0f0f0"} />
+                <Edges color="black" threshold={15} />
               </mesh>
               <mesh castShadow receiveShadow position={[-width/2 + 5, 20, 0]}>
                  <boxGeometry args={[10, 80, height]} />
                  <meshStandardMaterial color="#ccc" />
+                 <Edges color="black" threshold={15} />
               </mesh>
               <mesh position={[-width/2 + 25, 25, -height/4]} rotation={[0,0,0.2]}>
                  <boxGeometry args={[20, 10, 30]} />
                  <meshStandardMaterial color="white" />
+                 <Edges color="black" threshold={15} />
               </mesh>
                <mesh position={[-width/2 + 25, 25, height/4]} rotation={[0,0,0.2]}>
                  <boxGeometry args={[20, 10, 30]} />
                  <meshStandardMaterial color="white" />
+                 <Edges color="black" threshold={15} />
               </mesh>
             </group>
           );
@@ -122,18 +129,22 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
               <mesh castShadow receiveShadow position={[0, 0, 0]}>
                  <boxGeometry args={[width, 40, height]} />
                  <meshStandardMaterial color={color || "#ddd"} />
+                 <Edges color="black" threshold={15} />
               </mesh>
               <mesh castShadow position={[-width/2 + 10, 30, 0]}>
                  <boxGeometry args={[20, 60, height]} />
                  <meshStandardMaterial color="#ccc" />
+                 <Edges color="black" threshold={15} />
               </mesh>
                <mesh castShadow position={[0, 15, -height/2 + 10]}>
                  <boxGeometry args={[width, 50, 20]} />
                  <meshStandardMaterial color="#ccc" />
+                 <Edges color="black" threshold={15} />
               </mesh>
               <mesh castShadow position={[0, 15, height/2 - 10]}>
                  <boxGeometry args={[width, 50, 20]} />
                  <meshStandardMaterial color="#ccc" />
+                 <Edges color="black" threshold={15} />
               </mesh>
             </group>
           );
@@ -144,6 +155,7 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
                 <mesh castShadow position={[0, 35, 0]}>
                    <boxGeometry args={[width, 5, height]} />
                    <meshStandardMaterial color={color || "#e8e8e8"} />
+                   <Edges color="black" threshold={15} />
                 </mesh>
                 <mesh position={[width/2-5, 0, height/2-5]}>
                    <boxGeometry args={[5, 70, 5]} />
@@ -169,10 +181,12 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
                 <mesh castShadow receiveShadow>
                    <boxGeometry args={[width, 200, height]} />
                    <meshStandardMaterial color={color || "#f5f5f5"} />
+                   <Edges color="black" threshold={15} />
                 </mesh>
                 <mesh position={[width/2 + 1, 0, 0]}>
                     <boxGeometry args={[1, 190, 2]} />
                     <meshStandardMaterial color="#ddd" />
+                    <Edges color="black" threshold={15} />
                 </mesh>
              </group>
            );
@@ -182,10 +196,12 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
                    <mesh position={[-width/2 + 10, 40, 0]}>
                        <boxGeometry args={[20, 40, 40]} />
                        <meshStandardMaterial color={color || "white"} />
+                       <Edges color="black" threshold={15} />
                    </mesh>
                    <mesh position={[0, 20, 0]}>
                        <boxGeometry args={[30, 35, 30]} />
                        <meshStandardMaterial color={color || "white"} />
+                       <Edges color="black" threshold={15} />
                    </mesh>
                </group>
             );
@@ -239,14 +255,13 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   return (
     <group 
         ref={setRef} 
-        position={[px, 30, pz]} 
+        position={[px, baseY, pz]} 
         rotation={[0, rotY, 0]} 
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerUp}
-        // Explicitly prevent click event propagation if not handled
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} // Stop clicks from doing anything
     >
         {renderContent()}
         {/* Invisible hit box for easier selection */}
@@ -257,10 +272,11 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   );
 };
 
-const Room3D: React.FC<{ room: Room }> = ({ room }) => {
+const Room3D: React.FC<{ room: Room, yOffset: number }> = ({ room, yOffset }) => {
   const { x, y, width, height, floorFinish, color } = room;
   const px = x + width / 2;
   const pz = y + height / 2;
+  const floorY = 0.5 + yOffset;
 
   const floorColor = color || (
     floorFinish === 'tiled' ? '#e0e0e0' : 
@@ -270,24 +286,24 @@ const Room3D: React.FC<{ room: Room }> = ({ room }) => {
 
   return (
     <group>
-       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[px, 0.5, pz]}>
+       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[px, floorY, pz]}>
           <planeGeometry args={[width, height]} />
           <meshStandardMaterial color={floorColor} roughness={0.8} />
        </mesh>
 
-       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2, y]}>
+       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2 + yOffset, y]}>
           <boxGeometry args={[width + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS]} />
           <meshStandardMaterial color="white" />
        </mesh>
-       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2, y + height]}>
+       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2 + yOffset, y + height]}>
           <boxGeometry args={[width + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS]} />
           <meshStandardMaterial color="white" />
        </mesh>
-       <mesh castShadow receiveShadow position={[x, WALL_HEIGHT/2, pz]}>
+       <mesh castShadow receiveShadow position={[x, WALL_HEIGHT/2 + yOffset, pz]}>
           <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, height - WALL_THICKNESS]} />
           <meshStandardMaterial color="white" />
        </mesh>
-       <mesh castShadow receiveShadow position={[x + width, WALL_HEIGHT/2, pz]}>
+       <mesh castShadow receiveShadow position={[x + width, WALL_HEIGHT/2 + yOffset, pz]}>
           <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, height - WALL_THICKNESS]} />
           <meshStandardMaterial color="white" />
        </mesh>
@@ -297,77 +313,84 @@ const Room3D: React.FC<{ room: Room }> = ({ room }) => {
 
 interface SceneSetupProps { 
     data: SketchData; 
-    lastProjectRef: React.MutableRefObject<string | null>;
     cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
 }
 
-const SceneSetup = ({ data, lastProjectRef, cameraStateRef }: SceneSetupProps) => {
+const SceneSetup = ({ data, cameraStateRef }: SceneSetupProps) => {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls);
   
-  // Save camera state on unmount or before updates
+  // Track previous project ID to know when to reset vs restore
+  const lastProjectRef = useRef<string | null>(null);
+
+  // Save camera state on unmount
   useEffect(() => {
       return () => {
-          if (controls && camera) {
+          if (controls && camera && cameraStateRef) {
              // @ts-ignore
              const target = controls.target.clone();
              const position = camera.position.clone();
-             if (cameraStateRef) {
-                cameraStateRef.current = { position, target };
-             }
+             cameraStateRef.current = { position, target };
           }
       };
-  }, [controls, camera, cameraStateRef]);
+  }, []); // Only on unmount
 
   useEffect(() => {
      if (!data || data.rooms.length === 0) return;
 
-     const isSameProject = data.id === lastProjectRef.current;
-     lastProjectRef.current = data.id;
+     const isNewProject = data.id !== lastProjectRef.current;
+     
+     // If it's a new project (or first load), fit to bounds
+     if (isNewProject) {
+         lastProjectRef.current = data.id;
 
-     // If it's the same project, try to restore camera state instead of resetting
-     if (isSameProject && cameraStateRef?.current && controls) {
-         camera.position.copy(cameraStateRef.current.position);
-         // @ts-ignore
-         controls.target.copy(cameraStateRef.current.target);
-         // @ts-ignore
-         controls.update();
-         return;
+         // Check if we have a SAVED state for this ID? (Assuming parent clears cameraStateRef on new project)
+         // If cameraStateRef is null, it means new project.
+         
+         if (!cameraStateRef?.current) {
+             // FIT TO BOUNDS
+             const minX = Math.min(...data.rooms.map(r => r.x));
+             const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
+             const minY = Math.min(...data.rooms.map(r => r.y));
+             const maxY = Math.max(...data.rooms.map(r => r.y + r.height));
+
+             const width = maxX - minX;
+             const depth = maxY - minY;
+             const centerX = minX + width / 2;
+             const centerZ = minY + depth / 2;
+             
+             const maxDim = Math.max(width, depth);
+             const size = Math.max(maxDim, 100); 
+             
+             // @ts-ignore
+             const aspect = camera.aspect || 1;
+             const aspectFactor = aspect < 1 ? 1 / aspect : 1;
+
+             const fitOffset = size * 0.8 * aspectFactor;
+
+             camera.position.set(centerX, fitOffset, centerZ + fitOffset);
+             camera.lookAt(centerX, 0, centerZ);
+             camera.updateProjectionMatrix();
+
+             if (controls) {
+                // @ts-ignore
+                controls.target.set(centerX, 0, centerZ);
+                // @ts-ignore
+                controls.update();
+             }
+         } else {
+             // Restore from saved state (switching views back to 3D for SAME project)
+             camera.position.copy(cameraStateRef.current.position);
+             // @ts-ignore
+             controls.target.copy(cameraStateRef.current.target);
+             // @ts-ignore
+             controls.update();
+         }
      }
+     // If NOT new project (e.g. data update, floor switch), DO NOTHING to camera
+     // The scene will just re-render elements in new positions.
 
-     // Otherwise (New Project or No Saved State), fit to bounds
-     
-     // Calculate global bounds (all floors) to center the building
-     const minX = Math.min(...data.rooms.map(r => r.x));
-     const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
-     const minY = Math.min(...data.rooms.map(r => r.y));
-     const maxY = Math.max(...data.rooms.map(r => r.y + r.height));
-
-     const width = maxX - minX;
-     const depth = maxY - minY;
-     const centerX = minX + width / 2;
-     const centerZ = minY + depth / 2;
-     
-     const maxDim = Math.max(width, depth);
-     const size = Math.max(maxDim, 100); 
-     
-     // @ts-ignore
-     const aspect = camera.aspect || 1;
-     const aspectFactor = aspect < 1 ? 1 / aspect : 1;
-
-     const fitOffset = size * 0.8 * aspectFactor;
-
-     camera.position.set(centerX, fitOffset, centerZ + fitOffset);
-     camera.lookAt(centerX, 0, centerZ);
-     camera.updateProjectionMatrix();
-
-     if (controls) {
-        // @ts-ignore
-        controls.target.set(centerX, 0, centerZ);
-        // @ts-ignore
-        controls.update();
-     }
-  }, [data.id, camera, controls, lastProjectRef]); // Dependencies must be stable
+  }, [data.id]); // Only trigger when ID changes
 
   return null;
 };
@@ -389,11 +412,10 @@ const DragManager: React.FC<{
         if (!elGroup) return;
 
         // Calculate Offset on first move to prevent jump
-        // We do this here because we need the intersection with THIS plane (y=0) to be consistent
         let currentOffset = dragState.offset;
         if (!currentOffset) {
+             // Calculate offset relative to the object's current position
              currentOffset = e.point.clone().sub(elGroup.position);
-             // Only care about X/Z offset
              currentOffset.y = 0; 
              setDragState(prev => ({ ...prev, offset: currentOffset }));
              return; // Skip first frame to allow state update
@@ -453,18 +475,22 @@ const DragManager: React.FC<{
     );
 };
 
-const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate, cameraStateRef }) => {
-  const visibleRooms = data.rooms.filter(r => r.floor === activeFloor);
-  const visibleElements = data.elements.filter(e => e.floor === activeFloor);
+const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
+  // Multi-floor Logic
+  const visibleRooms = showAllFloors 
+    ? data.rooms 
+    : data.rooms.filter(r => r.floor === activeFloor);
+    
+  const visibleElements = showAllFloors 
+    ? data.elements 
+    : data.elements.filter(e => e.floor === activeFloor);
+
   const elementRefs = useRef<{[key: string]: THREE.Group}>({});
   const [dragState, setDragState] = useState<{id: string | null, offset: THREE.Vector3 | null}>({ id: null, offset: null });
-  
-  // Store last project ID at the parent level to prevent camera reset on re-renders caused by parent
-  const lastProjectRef = useRef<string | null>(null);
 
   const handleElementDown = (e: ThreeEvent<PointerEvent>, id: string) => {
       if (!onUpdate) return;
-      // Start drag state with null offset; let DragManager calculate it on first move relative to the ground plane
+      // Start drag state with null offset; let DragManager calculate it on first move
       setDragState({ id, offset: null });
   };
 
@@ -479,7 +505,6 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate, camera
            <Suspense fallback={<Html center><div className="text-xs font-mono animate-pulse">LOADING 3D...</div></Html>}>
                <SceneSetup 
                     data={data} 
-                    lastProjectRef={lastProjectRef} 
                     cameraStateRef={cameraStateRef}
                />
                <ambientLight intensity={0.8} />
@@ -488,13 +513,20 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate, camera
                </directionalLight>
                
                <group>
-                  {visibleRooms.map(room => <Room3D key={room.id} room={room} />)}
+                  {visibleRooms.map(room => (
+                    <Room3D 
+                        key={room.id} 
+                        room={room} 
+                        yOffset={(room.floor - 1) * FLOOR_PITCH} 
+                    />
+                  ))}
                   {visibleElements.map(el => (
                       <Element3D 
                         key={el.id} 
                         element={el} 
                         onPointerDown={handleElementDown} 
                         elementRefs={elementRefs}
+                        yOffset={(el.floor - 1) * FLOOR_PITCH}
                       />
                   ))}
                   

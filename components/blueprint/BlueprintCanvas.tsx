@@ -91,6 +91,7 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [localData, setLocalData] = useState<SketchData | null>(data);
   const [activeFloor, setActiveFloor] = useState<number>(1);
+  const [showAllFloors, setShowAllFloors] = useState(false);
   
   // Viewport State (2D)
   const [scale, setScale] = useState(0.6);
@@ -224,12 +225,8 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
   const handleWheel = (e: React.WheelEvent) => {
     if (viewMode === '3d') return;
-    // Allow zooming without Ctrl to match 3D behavior if desired, 
-    // but generally keeping simple scroll behavior is better. 
-    // User requested: "scrolling through the past zooms in or out". 
-    // So we allow direct zoom on wheel.
-    
-    e.preventDefault(); // Prevent browser scroll
+    // Allow zooming without Ctrl to match 3D behavior
+    e.preventDefault(); 
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
   };
@@ -259,7 +256,14 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
             });
         }
     } else if (id && type && x !== undefined && y !== undefined) {
-        // DRAG START
+        // SELECTION & DRAG LOGIC
+        if (selectedId !== id) {
+            // If not selected, just select (don't drag yet)
+            if (onSelect) onSelect(id, type);
+            return;
+        }
+        
+        // If already selected, start drag
         setDragState({
             id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y
         });
@@ -446,7 +450,12 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
       <FloorSelector 
         totalFloors={totalFloors}
         activeFloor={activeFloor}
-        onChange={setActiveFloor}
+        showAllFloors={showAllFloors}
+        onChange={(f) => {
+            setActiveFloor(f);
+            setShowAllFloors(false);
+        }}
+        onToggleAll={() => setShowAllFloors(!showAllFloors)}
       />
 
       <ViewportToolbar 
@@ -465,6 +474,7 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         <Canvas3D 
             data={localData} 
             activeFloor={activeFloor} 
+            showAllFloors={showAllFloors}
             onUpdate={onUpdate}
             cameraStateRef={cameraStateRef} 
         />

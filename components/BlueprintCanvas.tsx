@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchData, Room, ArchitecturalElement } from '../types';
 import { downloadDXF, downloadPDF, downloadSVG } from '../services/exportService';
@@ -91,11 +90,15 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [localData, setLocalData] = useState<SketchData | null>(data);
   const [activeFloor, setActiveFloor] = useState<number>(1);
+  const [showAllFloors, setShowAllFloors] = useState(false);
   
   // Viewport State
   const [scale, setScale] = useState(0.6);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 50, y: 50 });
+  
+  // Viewport State (3D) - Camera Persistence
+  const cameraStateRef = useRef<{ position: any, target: any } | null>(null);
   
   // Interaction State
   const [isPanning, setIsPanning] = useState(false);
@@ -123,6 +126,9 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         const minFloor = Math.min(...floors);
         setActiveFloor(minFloor);
         setTimeout(() => fitToScreen(minFloor), 100);
+        
+        // Reset camera state for new project
+        cameraStateRef.current = null;
     }
   }, [data?.id]);
 
@@ -436,7 +442,12 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
       <FloorSelector 
         totalFloors={totalFloors}
         activeFloor={activeFloor}
-        onChange={setActiveFloor}
+        showAllFloors={showAllFloors}
+        onChange={(f) => {
+            setActiveFloor(f);
+            setShowAllFloors(false);
+        }}
+        onToggleAll={() => setShowAllFloors(!showAllFloors)}
       />
 
       <ViewportToolbar 
@@ -455,7 +466,9 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         <Canvas3D 
             data={localData} 
             activeFloor={activeFloor} 
-            onUpdate={onUpdate} 
+            showAllFloors={showAllFloors}
+            onUpdate={onUpdate}
+            cameraStateRef={cameraStateRef}
         />
       ) : (
         <Canvas2D 

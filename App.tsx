@@ -1,10 +1,10 @@
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ChatSidebar from './components/ChatSidebar';
 import BlueprintCanvas from './components/BlueprintCanvas';
 import RightSidePanel from './components/RightSidePanel';
 import { SketchOption, SketchData, ElementType, RoomType } from './types';
-import { generateSingleSketch, generateSketchFromImage, DesignStyle } from './services/geminiService';
+import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from './services/geminiService';
 import { Layout, Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -36,57 +36,71 @@ const App: React.FC = () => {
   const [future, setFuture] = useState<SketchData[]>([]);
 
   // Helper to update current data and manage history
-  const handleSketchUpdate = (newData: SketchData) => {
-    const currentOption = sketchOptions[currentOptionIndex];
-    if (currentOption?.status !== 'loaded') return;
-
-    // Push current state to history before updating
-    setHistory(prev => [...prev, currentOption.data]);
-    setFuture([]); // Clear future on new action
-
-    // Update the main state
+  const handleSketchUpdate = useCallback((newData: SketchData) => {
     setSketchOptions(prev => {
         const newOpts = [...prev];
-        newOpts[currentOptionIndex] = { status: 'loaded', data: newData };
+        const currentOption = newOpts[currentOptionIndex];
+        if (currentOption?.status === 'loaded') {
+             // Push to history
+             setHistory(h => [...h, currentOption.data]);
+             setFuture([]);
+             
+             newOpts[currentOptionIndex] = { status: 'loaded', data: newData };
+        }
         return newOpts;
     });
-  };
+  }, [currentOptionIndex]);
 
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    const currentOption = sketchOptions[currentOptionIndex];
-    if (currentOption?.status !== 'loaded') return;
-
-    const previous = history[history.length - 1];
-    const newHistory = history.slice(0, -1);
-
-    setFuture(prev => [currentOption.data, ...prev]);
-    setHistory(newHistory);
-    
+  const handleUndo = useCallback(() => {
     setSketchOptions(prev => {
+        const currentOption = prev[currentOptionIndex];
+        if (currentOption?.status !== 'loaded' || history.length === 0) return prev;
+
+        const previous = history[history.length - 1];
+        const newHistory = history.slice(0, -1);
+
+        setFuture(f => [currentOption.data, ...f]);
+        setHistory(newHistory);
+        
         const newOpts = [...prev];
         newOpts[currentOptionIndex] = { status: 'loaded', data: previous };
         return newOpts;
     });
-  };
+  }, [currentOptionIndex, history]);
 
-  const handleRedo = () => {
-    if (future.length === 0) return;
-    const currentOption = sketchOptions[currentOptionIndex];
-    if (currentOption?.status !== 'loaded') return;
+  const handleRedo = useCallback(() => {
+     setSketchOptions(prev => {
+        const currentOption = prev[currentOptionIndex];
+        if (currentOption?.status !== 'loaded' || future.length === 0) return prev;
 
-    const next = future[0];
-    const newFuture = future.slice(1);
+        const next = future[0];
+        const newFuture = future.slice(1);
 
-    setHistory(prev => [...prev, currentOption.data]);
-    setFuture(newFuture);
+        setHistory(h => [...h, currentOption.data]);
+        setFuture(newFuture);
 
-    setSketchOptions(prev => {
         const newOpts = [...prev];
         newOpts[currentOptionIndex] = { status: 'loaded', data: next };
         return newOpts;
     });
-  };
+  }, [currentOptionIndex, future]);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+              e.preventDefault();
+              if (e.shiftKey) handleRedo();
+              else handleUndo();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+              e.preventDefault();
+              handleRedo();
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   const handleGenerate = useCallback(async (prompt: string) => {
     setIsGenerating(true);
@@ -127,7 +141,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // New Handler for Image/PDF Uploads
+  // New Handler for Image/PDF/DXF Uploads
   const handleGenerateFromImage = useCallback(async (file: File) => {
     setIsGenerating(true);
     setError(null);
@@ -142,20 +156,32 @@ const App: React.FC = () => {
     setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
 
     try {
-        // Convert file to base64
-        const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                // Remove prefix (e.g. "data:image/png;base64,")
-                const result = reader.result as string;
-                const base64Data = result.split(',')[1];
-                resolve(base64Data);
-            };
-            reader.onerror = error => reject(error);
-        });
+        let sketch: SketchData;
 
-        const sketch = await generateSketchFromImage(base64, file.type);
+        if (file.name.toLowerCase().endsWith('.dxf')) {
+           // Handle DXF Text Content
+           const text = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.readAsText(file);
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+           });
+           sketch = await generateSketchFromDXF(text);
+        } else {
+           // Handle Image/PDF Base64
+           const base64 = await new Promise<string>((resolve, reject) => {
+               const reader = new FileReader();
+               reader.readAsDataURL(file);
+               reader.onload = () => {
+                   // Remove prefix (e.g. "data:image/png;base64,")
+                   const result = reader.result as string;
+                   const base64Data = result.split(',')[1];
+                   resolve(base64Data);
+               };
+               reader.onerror = error => reject(error);
+           });
+           sketch = await generateSketchFromImage(base64, file.type);
+        }
         
         setSketchOptions(prev => {
             const newOpts = [...prev];
@@ -164,7 +190,7 @@ const App: React.FC = () => {
         });
     } catch (err) {
         console.error("Upload generation failed", err);
-        setError(`Failed to analyze ${file.name}. Ensure it is a clear floor plan.`);
+        setError(`Failed to analyze ${file.name}. Ensure it is a valid file.`);
         // Remove failed option
         setSketchOptions(prev => prev.filter((_, i) => i !== newIdx));
     } finally {
@@ -346,8 +372,8 @@ const App: React.FC = () => {
           {hasData && (
              <button 
                onClick={() => togglePanel('bottom')}
-               className="absolute bottom-0 left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-gray-200 border-b-0 px-4 py-1 rounded-t-lg shadow-[0_-2px_5px_rgba(0,0,0,0.05)] hover:bg-gray-50 hover:pb-2 transition-all flex items-center justify-center mb-[1px] group"
-               style={{ marginBottom: uiState.bottomPanelOpen ? '300px' : '0px', transition: 'margin-bottom 0.3s ease-in-out' }}
+               className="absolute left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-gray-200 border-b-0 px-4 py-1 rounded-t-lg shadow-md hover:bg-gray-50 hover:pb-2 transition-all flex items-center justify-center group"
+               style={{ bottom: uiState.bottomPanelOpen ? '300px' : '0px' }}
                title={uiState.bottomPanelOpen ? "Collapse Footer" : "Expand Footer"}
              >
                {uiState.bottomPanelOpen ? <ChevronDown size={16} className="text-gray-600" /> : <ChevronUp size={16} className="text-gray-600" />}

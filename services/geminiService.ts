@@ -175,6 +175,50 @@ export const generateSketchFromImage = async (base64Data: string, mimeType: stri
   }
 };
 
+export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchData> => {
+    try {
+        // Truncate if extremely large to fit context, though Gemini 2.5 has large context.
+        const contentSample = dxfContent.length > 500000 ? dxfContent.substring(0, 500000) + "...[TRUNCATED]" : dxfContent;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `
+            ACT AS: Senior CAD Interoperability Engineer.
+            TASK: Parse the following DXF (Drawing Exchange Format) text content and convert it into a structured architectural JSON format.
+
+            INPUT DATA (DXF CONTENT):
+            \`\`\`
+            ${contentSample}
+            \`\`\`
+
+            INSTRUCTIONS:
+            1. **Analyze Entities**: Look for LWPOLYLINE, LINE, TEXT entities that represent walls, rooms, and labels.
+            2. **Infer Topology**: Reconstruct the room boundaries from the lines.
+            3. **Scale**: DXF units are often millimeters or inches. Convert to CM (Centimeters) for the output.
+            4. **Identify Elements**: Detect blocks or shapes representing doors (arcs + lines), windows (parallel lines in walls), and furniture.
+            5. **Structure**: Group entities into 'rooms' based on closed loops or text labels inside boundaries.
+
+            OUTPUT:
+            - Return a JSON object matching the strictly defined schema.
+            - Ensure coordinates are clean and aligned.
+            `,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: RESPONSE_SCHEMA
+            }
+        });
+
+        const text = response.text;
+        if (!text) throw new Error("No response from AI");
+
+        return JSON.parse(text) as SketchData;
+
+    } catch (error) {
+        console.error("AI DXF Parsing Error:", error);
+        throw error;
+    }
+}
+
 const getStyleInstruction = (style: DesignStyle): string => {
   switch(style) {
     case 'Modern': return "Style: MODERN. Open plan, large windows, efficient flow.";

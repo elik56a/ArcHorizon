@@ -217,7 +217,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                         return <g><rect x="-5" y="-5" width={el.width+10} height={el.height+10} fill={fill} opacity={el.opacity ?? 1}/><path d={`M 0 ${el.height} A ${el.width} ${el.width} 0 0 1 ${el.width} 0`} fill="none" stroke={stroke} strokeDasharray="5,3"/><line x1="0" y1={el.height} x2={el.width} y2={0} stroke={stroke} strokeWidth="2"/></g>;
                      case 'window':
                         return <g>
-                            <rect x="-2" y="-2" width={el.width+4} height={el.height+4} fill="white"/>
+                            <rect x="-2" y="-2" width={el.width+4} height={el.height+4} fill="white" stroke="black" strokeWidth="1" />
                             <rect width={el.width} height={el.height} fill={el.color || "#e0f7fa"} stroke={stroke} strokeWidth="2" opacity={el.opacity ?? 1}/>
                             <line x1="0" y1={el.height/2} x2={el.width} y2={el.height/2} stroke={stroke}/>
                         </g>;

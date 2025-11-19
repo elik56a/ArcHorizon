@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon, GripHorizontal } from 'lucide-react';
+import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon, GripHorizontal, Building2 } from 'lucide-react';
 import { SketchData } from '../../types';
 
 // --- HELPER: TOOLTIP BUTTON ---
@@ -83,8 +83,10 @@ export const ViewportHeader: React.FC<{
 export const FloorSelector: React.FC<{
     totalFloors: number;
     activeFloor: number;
+    showAllFloors: boolean;
     onChange: (floor: number) => void;
-}> = ({ totalFloors, activeFloor, onChange }) => {
+    onToggleAll: () => void;
+}> = ({ totalFloors, activeFloor, showAllFloors, onChange, onToggleAll }) => {
     if (totalFloors <= 1) return null;
 
     return (
@@ -94,11 +96,19 @@ export const FloorSelector: React.FC<{
               <button 
                 key={floor}
                 onClick={() => onChange(floor)}
-                className={`w-8 h-8 font-mono text-sm font-bold transition-all border-2 ${activeFloor === floor ? 'bg-black text-white border-black' : 'border-transparent hover:border-gray-200'}`}
+                className={`w-8 h-8 font-mono text-sm font-bold transition-all border-2 ${activeFloor === floor && !showAllFloors ? 'bg-black text-white border-black' : 'border-transparent hover:border-gray-200'}`}
               >
                 {floor}
               </button>
            ))}
+           <div className="w-full h-px bg-gray-200 my-1"></div>
+           <button 
+                onClick={onToggleAll}
+                title="View Whole Building"
+                className={`w-8 h-8 flex items-center justify-center transition-all border-2 ${showAllFloors ? 'bg-blue-600 text-white border-blue-600' : 'border-transparent hover:border-gray-200 text-gray-600'}`}
+           >
+               <Building2 size={16} />
+           </button>
         </div>
     );
 };

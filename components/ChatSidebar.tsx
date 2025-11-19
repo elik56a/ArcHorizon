@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
-import { Send, Loader2, Bot, User, MessageSquare, ClipboardList, Plus, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileText, X, Image as ImageIcon } from 'lucide-react';
+import { Send, Loader2, Bot, User, MessageSquare, ClipboardList, Plus, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileText, X, Image as ImageIcon, FileCode } from 'lucide-react';
 
 interface InputPanelProps {
   onGenerate: (prompt: string) => void;
@@ -261,7 +261,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
       )}
 
       {mode === 'form' && (
-        <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
+        <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
            <div className="flex-1 overflow-y-auto">
              <form id="spec-form" onSubmit={handleFormSubmit} className="p-4 space-y-3">
                 
@@ -412,7 +412,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
       {mode === 'upload' && (
          <div className="flex-1 p-4 bg-slate-50 flex flex-col gap-4">
             <div 
-              className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer bg-white ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}`}
+              className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer bg-white ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-300'}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -424,13 +424,13 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
                  onChange={handleFileSelect} 
                  className="hidden" 
                  multiple 
-                 accept="image/*,application/pdf" 
+                 accept="image/*,application/pdf,.dxf" 
                />
                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
                  <UploadCloud className="text-blue-500 w-6 h-6" />
                </div>
                <p className="text-sm font-bold text-gray-700">Click or Drag files here</p>
-               <p className="text-xs text-gray-400 mt-1">Supports PDF, JPG, PNG</p>
+               <p className="text-xs text-gray-400 mt-1">Supports PDF, DXF, JPG, PNG</p>
             </div>
 
             {/* File List */}
@@ -443,7 +443,13 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
                {uploadFiles.map((file, idx) => (
                   <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3">
                       <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center shrink-0">
-                         {file.type.includes('pdf') ? <FileText size={20} className="text-red-500"/> : <ImageIcon size={20} className="text-purple-500"/>}
+                         {file.name.toLowerCase().endsWith('.dxf') ? (
+                            <FileCode size={20} className="text-green-600"/>
+                         ) : file.type.includes('pdf') ? (
+                            <FileText size={20} className="text-red-500"/>
+                         ) : (
+                            <ImageIcon size={20} className="text-purple-500"/>
+                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                          <p className="text-sm font-medium truncate">{file.name}</p>
