@@ -1,0 +1,170 @@
+
+import React, { useState } from 'react';
+import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon } from 'lucide-react';
+import { SketchData } from '../../types';
+
+// --- HELPER: TOOLTIP BUTTON ---
+interface TooltipButtonProps {
+    onClick: () => void;
+    icon: LucideIcon;
+    label: string;
+    disabled?: boolean;
+    className?: string;
+}
+
+const TooltipButton: React.FC<TooltipButtonProps> = ({ onClick, icon: Icon, label, disabled, className = "" }) => {
+    return (
+        <button 
+            onClick={onClick} 
+            disabled={disabled}
+            className={`relative group p-2 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed ${className ? className : 'hover:bg-gray-100 text-gray-700'}`}
+        >
+            <Icon size={18} />
+            
+            {/* Tooltip Container */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50 whitespace-nowrap">
+                <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative">
+                    {label}
+                    {/* Arrow */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                </div>
+            </div>
+        </button>
+    );
+};
+
+// --- HEADER COMPONENT ---
+export const ViewportHeader: React.FC<{ 
+    data: SketchData; 
+    activeFloor: number; 
+    totalFloors: number;
+    onDownload: (type: 'svg' | 'pdf' | 'dxf') => void;
+}> = ({ data, activeFloor, totalFloors, onDownload }) => {
+    const [showExportMenu, setShowExportMenu] = useState(false);
+
+    return (
+        <>
+            <div className="absolute top-6 left-6 bg-white border-2 border-black px-4 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-20 flex flex-col pointer-events-none select-none">
+                <h1 className="font-mono font-bold text-lg uppercase tracking-tighter">{data.title}</h1>
+                <div className="flex gap-4 text-[10px] font-mono mt-1 text-gray-600 uppercase">
+                    <span>AREA: {data.totalAreaSqm} M²</span>
+                    <span>FLOOR: {activeFloor}/{totalFloors}</span>
+                </div>
+            </div>
+
+            <div className="absolute top-6 right-6 flex gap-3 z-20">
+                <div className="relative">
+                    <button 
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="bg-black text-white p-3 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] hover:translate-y-0.5 hover:shadow-none transition-all rounded-full group relative"
+                    >
+                        <Download size={20} />
+                        {/* Custom Tooltip for the big Download button */}
+                        <div className="absolute top-full right-0 mt-2 hidden group-hover:block z-50 whitespace-nowrap mr-2">
+                            <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg">
+                                Export Project
+                            </div>
+                        </div>
+                    </button>
+                    {showExportMenu && (
+                        <div className="absolute right-0 top-full mt-2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex flex-col min-w-[140px]">
+                            <button onClick={() => { onDownload('svg'); setShowExportMenu(false); }} className="px-4 py-3 text-left hover:bg-gray-100 font-mono text-xs font-bold border-b border-gray-100">SVG (Vector)</button>
+                            <button onClick={() => { onDownload('pdf'); setShowExportMenu(false); }} className="px-4 py-3 text-left hover:bg-gray-100 font-mono text-xs font-bold border-b border-gray-100">PDF (Doc)</button>
+                            <button onClick={() => { onDownload('dxf'); setShowExportMenu(false); }} className="px-4 py-3 text-left hover:bg-gray-100 font-mono text-xs font-bold">DXF (AutoCAD R12)</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+};
+
+// --- FLOOR SELECTOR ---
+export const FloorSelector: React.FC<{
+    totalFloors: number;
+    activeFloor: number;
+    onChange: (floor: number) => void;
+}> = ({ totalFloors, activeFloor, onChange }) => {
+    if (totalFloors <= 1) return null;
+
+    return (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 z-30 flex flex-col gap-2">
+           <Layers size={16} className="mx-auto mb-1 text-gray-400"/>
+           {Array.from({length: totalFloors}, (_, i) => totalFloors - i).map(floor => (
+              <button 
+                key={floor}
+                onClick={() => onChange(floor)}
+                className={`w-8 h-8 font-mono text-sm font-bold transition-all border-2 ${activeFloor === floor ? 'bg-black text-white border-black' : 'border-transparent hover:border-gray-200'}`}
+              >
+                {floor}
+              </button>
+           ))}
+        </div>
+    );
+};
+
+// --- BOTTOM TOOLBAR ---
+interface ToolbarProps {
+    viewMode: '2d' | '3d';
+    setViewMode: (m: '2d' | '3d') => void;
+    scale: number;
+    setScale: React.Dispatch<React.SetStateAction<number>>;
+    rotateCanvas: (d: 'cw' | 'ccw') => void;
+    onFit: () => void;
+    history: {
+        undo: () => void;
+        redo: () => void;
+        canUndo: boolean;
+        canRedo: boolean;
+    } | undefined;
+}
+
+export const ViewportToolbar: React.FC<ToolbarProps> = ({ 
+    viewMode, setViewMode, scale, setScale, rotateCanvas, onFit, history 
+}) => {
+    return (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] px-4 py-2 flex items-center gap-4 z-30 rounded-none">
+             <div className="flex bg-gray-100 p-1 rounded border border-gray-300">
+                <button 
+                  onClick={() => setViewMode('2d')}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-all ${viewMode === '2d' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                >
+                  2D
+                </button>
+                <button 
+                  onClick={() => setViewMode('3d')}
+                  className={`px-3 py-1 text-xs font-bold rounded transition-all ${viewMode === '3d' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                >
+                  3D
+                </button>
+             </div>
+             
+             <div className="w-px h-4 bg-gray-300"></div>
+
+             {viewMode === '2d' && (
+               <>
+                <div className="flex gap-2 items-center">
+                    <TooltipButton onClick={() => setScale(s => s * 0.9)} icon={ZoomOut} label="Zoom Out" />
+                    <span className="font-mono text-xs w-10 text-center select-none text-gray-500">{Math.round(scale * 100)}%</span>
+                    <TooltipButton onClick={() => setScale(s => s * 1.1)} icon={ZoomIn} label="Zoom In" />
+                </div>
+                <div className="w-px h-4 bg-gray-300"></div>
+                <div className="flex gap-2 items-center">
+                    <TooltipButton onClick={() => rotateCanvas('ccw')} icon={RotateCcw} label="Rotate Left 90°" />
+                    <TooltipButton onClick={() => rotateCanvas('cw')} icon={RotateCw} label="Rotate Right 90°" />
+                </div>
+               </>
+             )}
+             
+             <div className="w-px h-4 bg-gray-300"></div>
+             <TooltipButton onClick={onFit} icon={Maximize} label="Fit to Screen" />
+             <div className="w-px h-4 bg-gray-300"></div>
+             {history && (
+               <>
+                 <TooltipButton onClick={history.undo} disabled={!history.canUndo} icon={Undo} label="Undo Change" />
+                 <TooltipButton onClick={history.redo} disabled={!history.canRedo} icon={Redo} label="Redo Change" />
+               </>
+             )}
+      </div>
+    );
+}
