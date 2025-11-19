@@ -284,6 +284,8 @@ const App: React.FC = () => {
   const currentSketchData = currentOption?.status === 'loaded' ? currentOption.data : null;
   const isLoadingCurrent = currentOption?.status === 'loading' || currentOption?.status === 'pending';
 
+  const hasData = sketchOptions.length > 0;
+
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* Header */}
@@ -318,25 +320,38 @@ const App: React.FC = () => {
         {/* CENTER CANVAS AREA */}
         <div className="flex-1 flex flex-col relative bg-gray-50 min-w-0 overflow-hidden">
           
-          {/* --- FLOATING TOGGLES --- */}
-          {/* Left Toggle - Attached to Panel Edge */}
+          {/* --- FLOATING TOGGLES (Absolute to Canvas Wrapper) --- */}
+          
+          {/* Left Toggle */}
           <button 
             onClick={() => togglePanel('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-300 border-l-0 p-1.5 rounded-r-lg shadow-md hover:bg-gray-100 hover:pr-2 transition-all w-5 hover:w-8 overflow-hidden flex items-center justify-center group"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-40 bg-white border-2 border-gray-200 border-l-0 py-3 px-1 rounded-r-lg shadow-md hover:bg-gray-50 hover:pl-2 transition-all flex items-center justify-center group"
             title={uiState.leftPanelOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
-             {uiState.leftPanelOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+             {uiState.leftPanelOpen ? <ChevronLeft size={16} className="text-gray-600" /> : <ChevronRight size={16} className="text-gray-600" />}
           </button>
 
-          {/* Right Toggle - Attached to Panel Edge (Only if Right Panel is active) */}
-          {sketchOptions.length > 0 && (
+          {/* Right Toggle (Only if data exists) */}
+          {hasData && (
             <button 
                 onClick={() => togglePanel('right')}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-300 border-r-0 p-1.5 rounded-l-lg shadow-md hover:bg-gray-100 hover:pl-2 transition-all w-5 hover:w-8 overflow-hidden flex items-center justify-center"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-40 bg-white border-2 border-gray-200 border-r-0 py-3 px-1 rounded-l-lg shadow-md hover:bg-gray-50 hover:pr-2 transition-all flex items-center justify-center"
                 title={uiState.rightPanelOpen ? "Collapse Properties" : "Expand Properties"}
             >
-                {uiState.rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                {uiState.rightPanelOpen ? <ChevronRight size={16} className="text-gray-600" /> : <ChevronLeft size={16} className="text-gray-600" />}
             </button>
+          )}
+
+          {/* Bottom Toggle (Only if data exists) */}
+          {hasData && (
+             <button 
+               onClick={() => togglePanel('bottom')}
+               className="absolute bottom-0 left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-gray-200 border-b-0 px-4 py-1 rounded-t-lg shadow-[0_-2px_5px_rgba(0,0,0,0.05)] hover:bg-gray-50 hover:pb-2 transition-all flex items-center justify-center mb-[1px] group"
+               style={{ marginBottom: uiState.bottomPanelOpen ? '300px' : '0px', transition: 'margin-bottom 0.3s ease-in-out' }}
+               title={uiState.bottomPanelOpen ? "Collapse Footer" : "Expand Footer"}
+             >
+               {uiState.bottomPanelOpen ? <ChevronDown size={16} className="text-gray-600" /> : <ChevronUp size={16} className="text-gray-600" />}
+             </button>
           )}
 
           {/* Error Toast */}
@@ -372,23 +387,9 @@ const App: React.FC = () => {
           </div>
 
           {/* Option Selector Footer (Collapsible) */}
-          <div className="flex-none relative z-50 bg-white">
-             {/* Bottom Toggle - Centered and Attached to Bottom Panel */}
-             {sketchOptions.length > 0 && (
-               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-50 pointer-events-auto">
-                 <button 
-                   onClick={() => togglePanel('bottom')}
-                   className="bg-white border border-gray-300 border-b-0 p-1.5 rounded-t-lg shadow-[0_-2px_4px_rgba(0,0,0,0.1)] hover:bg-gray-50 hover:pb-2 transition-all w-12 h-6 flex items-center justify-center group"
-                   title={uiState.bottomPanelOpen ? "Collapse Footer" : "Expand Footer"}
-                 >
-                   {uiState.bottomPanelOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                 </button>
-               </div>
-             )}
-
-             <div className={`transition-all duration-300 ease-in-out bg-white overflow-hidden border-black ${uiState.bottomPanelOpen ? 'max-h-[300px] opacity-100 border-t-2' : 'max-h-0 opacity-0 border-none'}`}>
-              {sketchOptions.length > 0 && (
-                <div className="p-4">
+          <div className={`flex-none relative z-40 bg-white transition-all duration-300 ease-in-out border-black ${uiState.bottomPanelOpen ? 'h-[300px] opacity-100 border-t-2' : 'h-0 opacity-0 border-none'}`}>
+            {hasData && (
+                <div className="p-4 h-full overflow-y-auto">
                   <div className="max-w-5xl mx-auto">
                     <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-2 flex items-center gap-2 font-mono tracking-wider">
                       <Grid size={12} /> Variation Selector
@@ -450,12 +451,11 @@ const App: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </div>
         
         {/* RIGHT PANEL */}
-        {sketchOptions.length > 0 && (
+        {hasData && (
            <div className={`relative transition-all duration-300 ease-in-out bg-white z-20 ${uiState.rightPanelOpen ? 'w-80 border-l border-gray-200' : 'w-0 opacity-0 overflow-hidden'}`}>
                <RightSidePanel 
                   selection={selection}

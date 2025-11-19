@@ -261,144 +261,150 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
       )}
 
       {mode === 'form' && (
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-           <form onSubmit={handleFormSubmit} className="p-4 space-y-3">
-              
-              {/* Section 1: Specs */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                 <button type="button" onClick={() => toggleSection('specs')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Ruler size={16} className="text-blue-500"/> Project Specs</div>
-                    {sections.specs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                 </button>
-                 {sections.specs && (
-                   <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                      <div className="grid grid-cols-2 gap-3">
-                          <div className="col-span-2">
-                             <label className="text-xs font-medium text-gray-500 mb-1 block">Project Type</label>
-                             <select className="w-full text-sm p-2 border rounded-md" value={formData.buildingType} onChange={e => setFormData({...formData, buildingType: e.target.value})}>
-                                <option>Apartment</option>
-                                <option>Villa</option>
-                                <option>Office</option>
-                                <option>Duplex</option>
-                                <option>Penthouse</option>
-                             </select>
-                          </div>
-                          <div>
-                             <label className="text-xs font-medium text-gray-500 mb-1 block">Unit System</label>
-                             <select className="w-full text-sm p-2 border rounded-md" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value as any})}>
-                                <option>Metric (m²)</option>
-                                <option>Imperial (sq ft)</option>
-                             </select>
-                          </div>
-                          <div>
-                             <label className="text-xs font-medium text-gray-500 mb-1 block">Total Area</label>
-                             <input type="number" className="w-full text-sm p-2 border rounded-md" value={formData.area} onChange={e => setFormData({...formData, area: Number(e.target.value)})}/>
-                          </div>
-                          <div>
-                             <label className="text-xs font-medium text-gray-500 mb-1 block">Floors</label>
-                             <div className="flex items-center border rounded-md overflow-hidden">
-                                <button type="button" className="px-3 py-2 hover:bg-gray-100 border-r" onClick={() => setFormData(p => ({...p, floors: Math.max(1, p.floors - 1)}))}>-</button>
-                                <div className="flex-1 text-center text-sm font-medium">{formData.floors}</div>
-                                <button type="button" className="px-3 py-2 hover:bg-gray-100 border-l" onClick={() => setFormData(p => ({...p, floors: Math.min(5, p.floors + 1)}))}>+</button>
-                             </div>
-                          </div>
-                          <div>
-                             <label className="text-xs font-medium text-gray-500 mb-1 block">Ceiling (m)</label>
-                             <input type="number" step="0.1" className="w-full text-sm p-2 border rounded-md" value={formData.ceilingHeight} onChange={e => setFormData({...formData, ceilingHeight: Number(e.target.value)})}/>
-                          </div>
-                      </div>
-                   </div>
-                 )}
-              </div>
+        <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
+           <div className="flex-1 overflow-y-auto">
+             <form id="spec-form" onSubmit={handleFormSubmit} className="p-4 space-y-3">
+                
+                {/* Section 1: Specs */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                   <button type="button" onClick={() => toggleSection('specs')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Ruler size={16} className="text-blue-500"/> Project Specs</div>
+                      {sections.specs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                   </button>
+                   {sections.specs && (
+                     <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                               <label className="text-xs font-medium text-gray-500 mb-1 block">Project Type</label>
+                               <select className="w-full text-sm p-2 border rounded-md" value={formData.buildingType} onChange={e => setFormData({...formData, buildingType: e.target.value})}>
+                                  <option>Apartment</option>
+                                  <option>Villa</option>
+                                  <option>Office</option>
+                                  <option>Duplex</option>
+                                  <option>Penthouse</option>
+                               </select>
+                            </div>
+                            <div>
+                               <label className="text-xs font-medium text-gray-500 mb-1 block">Unit System</label>
+                               <select className="w-full text-sm p-2 border rounded-md" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value as any})}>
+                                  <option>Metric (m²)</option>
+                                  <option>Imperial (sq ft)</option>
+                               </select>
+                            </div>
+                            <div>
+                               <label className="text-xs font-medium text-gray-500 mb-1 block">Total Area</label>
+                               <input type="number" className="w-full text-sm p-2 border rounded-md" value={formData.area} onChange={e => setFormData({...formData, area: Number(e.target.value)})}/>
+                            </div>
+                            <div>
+                               <label className="text-xs font-medium text-gray-500 mb-1 block">Floors</label>
+                               <div className="flex items-center border rounded-md overflow-hidden">
+                                  <button type="button" className="px-3 py-2 hover:bg-gray-100 border-r" onClick={() => setFormData(p => ({...p, floors: Math.max(1, p.floors - 1)}))}>-</button>
+                                  <div className="flex-1 text-center text-sm font-medium">{formData.floors}</div>
+                                  <button type="button" className="px-3 py-2 hover:bg-gray-100 border-l" onClick={() => setFormData(p => ({...p, floors: Math.min(5, p.floors + 1)}))}>+</button>
+                               </div>
+                            </div>
+                            <div>
+                               <label className="text-xs font-medium text-gray-500 mb-1 block">Ceiling (m)</label>
+                               <input type="number" step="0.1" className="w-full text-sm p-2 border rounded-md" value={formData.ceilingHeight} onChange={e => setFormData({...formData, ceilingHeight: Number(e.target.value)})}/>
+                            </div>
+                        </div>
+                     </div>
+                   )}
+                </div>
 
-              {/* Section 2: Rooms */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                 <button type="button" onClick={() => toggleSection('rooms')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Home size={16} className="text-blue-500"/> Spaces & Rooms</div>
-                    {sections.rooms ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                 </button>
-                 {sections.rooms && (
-                   <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                      <div className="flex justify-between items-center">
-                         <label className="text-sm text-gray-600">Bedrooms</label>
-                         <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                         <label className="text-sm text-gray-600">Bathrooms</label>
-                         <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 pt-2">
-                         {['hasLivingRoom', 'hasKitchen', 'hasDining', 'hasStudy'].map((key) => (
-                           <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                              <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
-                              {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
-                           </label>
-                         ))}
-                      </div>
-                   </div>
-                 )}
-              </div>
+                {/* Section 2: Rooms */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                   <button type="button" onClick={() => toggleSection('rooms')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Home size={16} className="text-blue-500"/> Spaces & Rooms</div>
+                      {sections.rooms ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                   </button>
+                   {sections.rooms && (
+                     <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex justify-between items-center">
+                           <label className="text-sm text-gray-600">Bedrooms</label>
+                           <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} />
+                        </div>
+                        <div className="flex justify-between items-center">
+                           <label className="text-sm text-gray-600">Bathrooms</label>
+                           <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                           {['hasLivingRoom', 'hasKitchen', 'hasDining', 'hasStudy'].map((key) => (
+                             <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                                <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
+                                {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
+                             </label>
+                           ))}
+                        </div>
+                     </div>
+                   )}
+                </div>
 
-              {/* Section 3: Outdoor */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                 <button type="button" onClick={() => toggleSection('outdoor')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Trees size={16} className="text-blue-500"/> Outdoor & Amenities</div>
-                    {sections.outdoor ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                 </button>
-                 {sections.outdoor && (
-                   <div className="p-4 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                      <div className="grid grid-cols-2 gap-2">
-                         {['hasBalcony', 'hasGarden', 'hasParking', 'hasStorage'].map((key) => (
-                           <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                              <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
-                              {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
-                           </label>
-                         ))}
-                      </div>
-                   </div>
-                 )}
-              </div>
+                {/* Section 3: Outdoor */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                   <button type="button" onClick={() => toggleSection('outdoor')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Trees size={16} className="text-blue-500"/> Outdoor & Amenities</div>
+                      {sections.outdoor ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                   </button>
+                   {sections.outdoor && (
+                     <div className="p-4 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                        <div className="grid grid-cols-2 gap-2">
+                           {['hasBalcony', 'hasGarden', 'hasParking', 'hasStorage'].map((key) => (
+                             <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                                <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
+                                {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
+                             </label>
+                           ))}
+                        </div>
+                     </div>
+                   )}
+                </div>
 
-              {/* Section 4: Style */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                 <button type="button" onClick={() => toggleSection('style')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Sparkles size={16} className="text-blue-500"/> Style & Notes</div>
-                    {sections.style ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                 </button>
-                 {sections.style && (
-                   <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
-                      <div>
-                         <label className="text-xs font-medium text-gray-500 mb-1 block">Design Aesthetic</label>
-                         <div className="flex bg-gray-100 p-1 rounded-lg">
-                            {['Modern', 'Rustic', 'Creative'].map(s => (
-                               <button key={s} type="button" onClick={() => setFormData({...formData, designStyle: s as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${formData.designStyle === s ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-500'}`}>
-                                  {s}
-                               </button>
-                            ))}
-                         </div>
-                      </div>
-                      <div>
-                         <label className="text-xs font-medium text-gray-500 mb-1 block">Custom Requirements</label>
-                         <textarea 
-                            className="w-full text-sm p-2 border rounded-md h-20 resize-none focus:ring-1 focus:ring-blue-500 outline-none" 
-                            placeholder="E.g. I want a kitchen island and a walk-in closet..."
-                            value={formData.customNotes}
-                            onChange={e => setFormData({...formData, customNotes: e.target.value})}
-                         />
-                      </div>
-                   </div>
-                 )}
-              </div>
+                {/* Section 4: Style */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
+                   <button type="button" onClick={() => toggleSection('style')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Sparkles size={16} className="text-blue-500"/> Style & Notes</div>
+                      {sections.style ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                   </button>
+                   {sections.style && (
+                     <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                        <div>
+                           <label className="text-xs font-medium text-gray-500 mb-1 block">Design Aesthetic</label>
+                           <div className="flex bg-gray-100 p-1 rounded-lg">
+                              {['Modern', 'Rustic', 'Creative'].map(s => (
+                                 <button key={s} type="button" onClick={() => setFormData({...formData, designStyle: s as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${formData.designStyle === s ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-500'}`}>
+                                    {s}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+                        <div>
+                           <label className="text-xs font-medium text-gray-500 mb-1 block">Custom Requirements</label>
+                           <textarea 
+                              className="w-full text-sm p-2 border rounded-md h-20 resize-none focus:ring-1 focus:ring-blue-500 outline-none" 
+                              placeholder="E.g. I want a kitchen island and a walk-in closet..."
+                              value={formData.customNotes}
+                              onChange={e => setFormData({...formData, customNotes: e.target.value})}
+                           />
+                        </div>
+                     </div>
+                   )}
+                </div>
+             </form>
+           </div>
 
+           {/* Submit Button - Fixed at bottom */}
+           <div className="p-4 bg-white border-t border-gray-200 shrink-0">
               <button 
                  type="submit"
+                 form="spec-form"
                  disabled={isGenerating}
-                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-4"
+                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                  {isGenerating ? <Loader2 className="animate-spin" /> : <Send size={18} />}
                  Generate Blueprint
               </button>
-           </form>
+           </div>
         </div>
       )}
 
