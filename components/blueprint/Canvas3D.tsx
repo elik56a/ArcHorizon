@@ -53,8 +53,9 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   const startPosRef = useRef<{x: number, y: number} | null>(null);
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-      // IMPORTANT: Stop propagation to prevent OrbitControls from rotating camera on simple click/press
-      e.stopPropagation();
+      // NOTE: We do NOT stop propagation immediately. 
+      // This allows OrbitControls to function for rotation if it's just a click or drag on scene.
+      // If long press triggers, we will engage Drag Mode which disables OrbitControls in the parent.
       
       startPosRef.current = { x: e.clientX, y: e.clientY };
 
@@ -75,7 +76,7 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-      // Cancel long press if moved too much (Orbit/Scroll)
+      // Cancel long press if moved significantly (Orbiting)
       if (timerRef.current && startPosRef.current) {
           const dx = Math.abs(e.clientX - startPosRef.current.x);
           const dy = Math.abs(e.clientY - startPosRef.current.y);
@@ -293,17 +294,17 @@ const Room3D: React.FC<{ room: Room }> = ({ room }) => {
   );
 };
 
-const SceneSetup = ({ data }: { data: SketchData }) => {
+const SceneSetup = ({ data, lastProjectRef }: { data: SketchData, lastProjectRef: React.MutableRefObject<string | null> }) => {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls);
-  const lastProjectId = useRef<string | null>(null);
   
   useEffect(() => {
      if (!data || data.rooms.length === 0) return;
      
-     // Only reset camera if we load a new project (different ID)
-     if (data.id === lastProjectId.current) return;
-     lastProjectId.current = data.id;
+     // CRITICAL: Only reset camera if we are loading a completely different project ID
+     // Moving floors or dragging elements should NOT reset the camera.
+     if (data.id === lastProjectRef.current) return;
+     lastProjectRef.current = data.id;
 
      // Calculate global bounds (all floors) to center the building
      const minX = Math.min(...data.rooms.map(r => r.x));
@@ -335,7 +336,7 @@ const SceneSetup = ({ data }: { data: SketchData }) => {
         // @ts-ignore
         controls.update();
      }
-  }, [data.id, camera, controls]);
+  }, [data.id, camera, controls, lastProjectRef]); // Dependencies must be stable
 
   return null;
 };
@@ -351,7 +352,7 @@ const DragManager: React.FC<{
 
     const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         if (!dragState.id) return;
-        e.stopPropagation();
+        e.stopPropagation(); // Stop other interactions while dragging
         
         const elGroup = elementRefs.current[dragState.id];
         if (!elGroup) return;
@@ -412,6 +413,8 @@ const DragManager: React.FC<{
             visible={!!dragState.id} // Only active during drag
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            // IMPORTANT: Catch initial clicks on the drag plane if the user moves quickly
+            onPointerDown={(e) => e.stopPropagation()}
         >
             <planeGeometry args={[100000, 100000]} />
             <meshBasicMaterial color="red" transparent opacity={0} />
@@ -425,6 +428,9 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate }) => {
   const elementRefs = useRef<{[key: string]: THREE.Group}>({});
   const [dragState, setDragState] = useState<{id: string | null, offset: THREE.Vector3 | null}>({ id: null, offset: null });
   
+  // Store last project ID at the parent level to prevent camera reset on re-renders caused by parent
+  const lastProjectRef = useRef<string | null>(null);
+
   const handleElementDown = (e: ThreeEvent<PointerEvent>, id: string) => {
       if (!onUpdate) return;
       // Start drag state with null offset; let DragManager calculate it on first move relative to the ground plane
@@ -440,7 +446,7 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate }) => {
             gl={{ antialias: true, logarithmicDepthBuffer: true }}
         >
            <Suspense fallback={<Html center><div className="text-xs font-mono animate-pulse">LOADING 3D...</div></Html>}>
-               <SceneSetup data={data} />
+               <SceneSetup data={data} lastProjectRef={lastProjectRef} />
                <ambientLight intensity={0.8} />
                <directionalLight position={[3000, 4000, 2000]} intensity={1} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.001}>
                   <orthographicCamera attach="shadow-camera" args={[-5000, 5000, 5000, -5000]} near={0.1} far={20000} />
@@ -471,6 +477,7 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, onUpdate }) => {
                       />
                   )}
                </group>
+               {/* OrbitControls disabled when dragging to prevent camera movement */}
                <OrbitControls makeDefault minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} enabled={!dragState.id}/>
                <Environment preset="city" />
            </Suspense>

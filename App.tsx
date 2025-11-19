@@ -319,23 +319,25 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col relative bg-gray-50 min-w-0 overflow-hidden">
           
           {/* --- FLOATING TOGGLES --- */}
-          {/* Left Toggle */}
+          {/* Left Toggle - Attached to Panel Edge */}
           <button 
             onClick={() => togglePanel('left')}
-            className="absolute left-0 top-1/2 -translate-x-1/2 z-40 bg-white border border-gray-300 p-1.5 rounded-r-lg shadow-md hover:bg-gray-100 hover:w-8 transition-all w-6 overflow-hidden flex items-center justify-center group"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-300 border-l-0 p-1.5 rounded-r-lg shadow-md hover:bg-gray-100 hover:pr-2 transition-all w-5 hover:w-8 overflow-hidden flex items-center justify-center group"
             title={uiState.leftPanelOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
              {uiState.leftPanelOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
 
-          {/* Right Toggle */}
-          <button 
-            onClick={() => togglePanel('right')}
-            className="absolute right-0 top-1/2 -translate-x-1/2 z-40 bg-white border border-gray-300 p-1.5 rounded-l-lg shadow-md hover:bg-gray-100 hover:w-8 transition-all w-6 overflow-hidden flex items-center justify-center"
-            title={uiState.rightPanelOpen ? "Collapse Properties" : "Expand Properties"}
-          >
-             {uiState.rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
+          {/* Right Toggle - Attached to Panel Edge (Only if Right Panel is active) */}
+          {sketchOptions.length > 0 && (
+            <button 
+                onClick={() => togglePanel('right')}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-40 bg-white border border-gray-300 border-r-0 p-1.5 rounded-l-lg shadow-md hover:bg-gray-100 hover:pl-2 transition-all w-5 hover:w-8 overflow-hidden flex items-center justify-center"
+                title={uiState.rightPanelOpen ? "Collapse Properties" : "Expand Properties"}
+            >
+                {uiState.rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+          )}
 
           {/* Error Toast */}
           {error && (
@@ -371,12 +373,12 @@ const App: React.FC = () => {
 
           {/* Option Selector Footer (Collapsible) */}
           <div className="flex-none relative z-50 bg-white">
-             {/* Bottom Toggle - Repositioned and Styled to match side toggles */}
+             {/* Bottom Toggle - Centered and Attached to Bottom Panel */}
              {sketchOptions.length > 0 && (
-               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-50">
+               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full z-50 pointer-events-auto">
                  <button 
                    onClick={() => togglePanel('bottom')}
-                   className="bg-white border border-gray-300 border-b-0 p-1.5 rounded-t-lg shadow-[0_-2px_4px_rgba(0,0,0,0.1)] hover:bg-gray-50 transition-all w-8 h-6 overflow-hidden flex items-center justify-center group"
+                   className="bg-white border border-gray-300 border-b-0 p-1.5 rounded-t-lg shadow-[0_-2px_4px_rgba(0,0,0,0.1)] hover:bg-gray-50 hover:pb-2 transition-all w-12 h-6 flex items-center justify-center group"
                    title={uiState.bottomPanelOpen ? "Collapse Footer" : "Expand Footer"}
                  >
                    {uiState.bottomPanelOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -453,15 +455,17 @@ const App: React.FC = () => {
         </div>
         
         {/* RIGHT PANEL */}
-        <div className={`relative transition-all duration-300 ease-in-out bg-white z-20 ${uiState.rightPanelOpen ? 'w-80 border-l border-gray-200' : 'w-0 opacity-0 overflow-hidden'}`}>
-            <RightSidePanel 
-               selection={selection}
-               data={currentSketchData}
-               onUpdateItem={handleUpdateItem}
-               onDeleteItem={handleDeleteItem}
-               onAddItem={handleAddItem}
-            />
-        </div>
+        {sketchOptions.length > 0 && (
+           <div className={`relative transition-all duration-300 ease-in-out bg-white z-20 ${uiState.rightPanelOpen ? 'w-80 border-l border-gray-200' : 'w-0 opacity-0 overflow-hidden'}`}>
+               <RightSidePanel 
+                  selection={selection}
+                  data={currentSketchData}
+                  onUpdateItem={handleUpdateItem}
+                  onDeleteItem={handleDeleteItem}
+                  onAddItem={handleAddItem}
+               />
+           </div>
+        )}
       </main>
     </div>
   );
