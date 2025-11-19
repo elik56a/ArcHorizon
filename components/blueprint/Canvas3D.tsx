@@ -313,15 +313,19 @@ const Room3D: React.FC<{ room: Room, yOffset: number }> = ({ room, yOffset }) =>
 
 interface SceneSetupProps { 
     data: SketchData; 
+    activeFloor: number;
+    showAllFloors: boolean;
     cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
 }
 
-const SceneSetup = ({ data, cameraStateRef }: SceneSetupProps) => {
+const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneSetupProps) => {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls);
   
   // Track previous project ID to know when to reset vs restore
   const lastProjectRef = useRef<string | null>(null);
+  // Track previous floor to calculate relative vertical shift
+  const prevFloorRef = useRef<number>(activeFloor);
 
   // Save camera state on unmount
   useEffect(() => {
@@ -333,22 +337,19 @@ const SceneSetup = ({ data, cameraStateRef }: SceneSetupProps) => {
              cameraStateRef.current = { position, target };
           }
       };
-  }, []); // Only on unmount
+  }, []); 
 
+  // INITIAL LOAD / PROJECT CHANGE
   useEffect(() => {
      if (!data || data.rooms.length === 0) return;
-
      const isNewProject = data.id !== lastProjectRef.current;
-     
-     // If it's a new project (or first load), fit to bounds
+
      if (isNewProject) {
          lastProjectRef.current = data.id;
+         prevFloorRef.current = activeFloor;
 
-         // Check if we have a SAVED state for this ID? (Assuming parent clears cameraStateRef on new project)
-         // If cameraStateRef is null, it means new project.
-         
          if (!cameraStateRef?.current) {
-             // FIT TO BOUNDS
+             // FIT TO BOUNDS (Initial Centering)
              const minX = Math.min(...data.rooms.map(r => r.x));
              const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
              const minY = Math.min(...data.rooms.map(r => r.y));
@@ -359,27 +360,26 @@ const SceneSetup = ({ data, cameraStateRef }: SceneSetupProps) => {
              const centerX = minX + width / 2;
              const centerZ = minY + depth / 2;
              
-             const maxDim = Math.max(width, depth);
-             const size = Math.max(maxDim, 100); 
+             const currentFloorY = (activeFloor - 1) * FLOOR_PITCH;
              
              // @ts-ignore
              const aspect = camera.aspect || 1;
              const aspectFactor = aspect < 1 ? 1 / aspect : 1;
+             const fitOffset = Math.max(width, depth) * 0.8 * aspectFactor;
 
-             const fitOffset = size * 0.8 * aspectFactor;
-
-             camera.position.set(centerX, fitOffset, centerZ + fitOffset);
-             camera.lookAt(centerX, 0, centerZ);
-             camera.updateProjectionMatrix();
-
+             // Set initial camera looking at floor center
+             camera.position.set(centerX, currentFloorY + fitOffset, centerZ + fitOffset);
+             camera.lookAt(centerX, currentFloorY, centerZ);
+             
              if (controls) {
+                // CRITICAL: Set target to Floor Y, not 0. This prevents "pulling" feeling.
                 // @ts-ignore
-                controls.target.set(centerX, 0, centerZ);
+                controls.target.set(centerX, currentFloorY, centerZ);
                 // @ts-ignore
                 controls.update();
              }
          } else {
-             // Restore from saved state (switching views back to 3D for SAME project)
+             // Restore from saved state
              camera.position.copy(cameraStateRef.current.position);
              // @ts-ignore
              controls.target.copy(cameraStateRef.current.target);
@@ -387,10 +387,33 @@ const SceneSetup = ({ data, cameraStateRef }: SceneSetupProps) => {
              controls.update();
          }
      }
-     // If NOT new project (e.g. data update, floor switch), DO NOTHING to camera
-     // The scene will just re-render elements in new positions.
+  }, [data.id]);
 
-  }, [data.id]); // Only trigger when ID changes
+  // FLOOR CHANGE / WHOLE BUILDING TOGGLE logic
+  useEffect(() => {
+      if (!controls) return;
+
+      // Calculate floor difference to shift camera vertically
+      const floorDiff = showAllFloors ? 0 : (activeFloor - prevFloorRef.current);
+      
+      // Update Ref
+      prevFloorRef.current = activeFloor;
+      
+      if (floorDiff !== 0) {
+          // Shift camera vertically to match new floor height
+          const yShift = floorDiff * FLOOR_PITCH;
+          
+          camera.position.y += yShift;
+          // @ts-ignore
+          controls.target.y += yShift;
+          // @ts-ignore
+          controls.update();
+      } else if (showAllFloors) {
+           // If showing all floors, maybe center vertically on building?
+           // For now we leave it where it is to avoid disorientation
+      }
+
+  }, [activeFloor, showAllFloors]);
 
   return null;
 };
@@ -505,6 +528,8 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = 
            <Suspense fallback={<Html center><div className="text-xs font-mono animate-pulse">LOADING 3D...</div></Html>}>
                <SceneSetup 
                     data={data} 
+                    activeFloor={activeFloor}
+                    showAllFloors={showAllFloors}
                     cameraStateRef={cameraStateRef}
                />
                <ambientLight intensity={0.8} />

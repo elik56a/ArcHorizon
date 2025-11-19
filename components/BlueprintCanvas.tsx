@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchData, Room, ArchitecturalElement } from '../types';
 import { downloadDXF, downloadPDF, downloadSVG } from '../services/exportService';
-import { Loader2, PenTool, Compass, Ruler, Box, Layers } from 'lucide-react';
+import { Loader2, PenTool, Compass, Ruler, Box, Layers, LayoutTemplate, ArrowUpCircle } from 'lucide-react';
 import Canvas3D from './blueprint/Canvas3D';
 import Canvas2D from './blueprint/Canvas2D';
 import { ViewportHeader, ViewportToolbar, FloorSelector } from './blueprint/BlueprintControls';
@@ -227,6 +228,10 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
       e.preventDefault();
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
+    } else {
+       // Non-ctrl zoom support as per request
+       const delta = e.deltaY > 0 ? 0.9 : 1.1;
+       setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
     }
   };
 
@@ -417,10 +422,40 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
   if (!localData) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-white text-gray-400">
-        <div className="text-center">
-          <PenTool className="w-12 h-12 mx-auto mb-4 opacity-20" />
-          <p className="font-mono text-sm">NO BLUEPRINT LOADED</p>
+      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200 p-10">
+        <div className="max-w-lg w-full text-center space-y-8 opacity-60 hover:opacity-100 transition-opacity duration-700">
+            {/* Technical Graphic */}
+            <div className="relative w-64 h-40 mx-auto border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
+                <div className="absolute inset-0 grid grid-cols-6 grid-rows-4 gap-px opacity-20">
+                   {Array.from({length: 24}).map((_, i) => <div key={i} className="bg-gray-400/50"></div>)}
+                </div>
+                <LayoutTemplate size={48} className="text-gray-300" />
+                <div className="absolute -bottom-3 -right-3 bg-white p-2 rounded-full border shadow-sm">
+                   <PenTool size={20} className="text-blue-500" />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Ready to Design</h2>
+                <p className="text-gray-500 font-mono text-sm leading-relaxed">
+                  Enter your requirements in the chat or upload a sketch to generate a professional CAD blueprint instantly.
+                </p>
+            </div>
+            
+            <div className="flex justify-center gap-8 text-xs font-mono text-gray-400 uppercase tracking-widest">
+                <div className="flex flex-col items-center gap-1">
+                   <Box size={16} />
+                   <span>2D & 3D</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                   <Layers size={16} />
+                   <span>Multi-Floor</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                   <ArrowUpCircle size={16} />
+                   <span>DXF Export</span>
+                </div>
+            </div>
         </div>
       </div>
     );

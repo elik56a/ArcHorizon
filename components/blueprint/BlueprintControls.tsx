@@ -86,7 +86,8 @@ export const FloorSelector: React.FC<{
     showAllFloors: boolean;
     onChange: (floor: number) => void;
     onToggleAll: () => void;
-}> = ({ totalFloors, activeFloor, showAllFloors, onChange, onToggleAll }) => {
+    viewMode?: '2d' | '3d';
+}> = ({ totalFloors, activeFloor, showAllFloors, onChange, onToggleAll, viewMode = '2d' }) => {
     if (totalFloors <= 1) return null;
 
     return (
@@ -101,14 +102,19 @@ export const FloorSelector: React.FC<{
                 {floor}
               </button>
            ))}
-           <div className="w-full h-px bg-gray-200 my-1"></div>
-           <button 
-                onClick={onToggleAll}
-                title="View Whole Building"
-                className={`w-8 h-8 flex items-center justify-center transition-all border-2 ${showAllFloors ? 'bg-blue-600 text-white border-blue-600' : 'border-transparent hover:border-gray-200 text-gray-600'}`}
-           >
-               <Building2 size={16} />
-           </button>
+           
+           {viewMode === '3d' && (
+               <>
+                <div className="w-full h-px bg-gray-200 my-1"></div>
+                <button 
+                        onClick={onToggleAll}
+                        title="View Whole Building"
+                        className={`w-8 h-8 flex items-center justify-center transition-all border-2 ${showAllFloors ? 'bg-blue-600 text-white border-blue-600' : 'border-transparent hover:border-gray-200 text-gray-600'}`}
+                >
+                    <Building2 size={16} />
+                </button>
+               </>
+           )}
         </div>
     );
 };

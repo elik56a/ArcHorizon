@@ -5,7 +5,7 @@ import BlueprintCanvas from './components/BlueprintCanvas';
 import RightSidePanel from './components/RightSidePanel';
 import { SketchOption, SketchData, ElementType, RoomType } from './types';
 import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from './services/geminiService';
-import { Layout, Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Layout, Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 
 const App: React.FC = () => {
   const [sketchOptions, setSketchOptions] = useState<SketchOption[]>([]);
@@ -41,7 +41,6 @@ const App: React.FC = () => {
         const newOpts = [...prev];
         const currentOption = newOpts[currentOptionIndex];
         if (currentOption?.status === 'loaded') {
-             // Push to history
              setHistory(h => [...h, currentOption.data]);
              setFuture([]);
              
@@ -88,6 +87,7 @@ const App: React.FC = () => {
   // Keyboard Shortcuts
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
+          if (isGenerating) return; 
           if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
               e.preventDefault();
               if (e.shiftKey) handleRedo();
@@ -100,7 +100,7 @@ const App: React.FC = () => {
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, isGenerating]);
 
   const handleGenerate = useCallback(async (prompt: string) => {
     setIsGenerating(true);
@@ -111,26 +111,31 @@ const App: React.FC = () => {
     setLastPrompt(prompt);
     setSelection(null);
     
-    // Auto-open bottom panel to show results
-    setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
-
-    // Initialize: Option 1 loading, others IDLE
+    // Initialize with a loading state
     setSketchOptions([
       { status: 'loading', id: 'opt-1' },
       { status: 'idle', id: 'opt-2' },
       { status: 'idle', id: 'opt-3' }
     ]);
+    
+    // HIDE bottom panel during initial generation (as requested)
+    setUiState(prev => ({ ...prev, bottomPanelOpen: false }));
 
     try {
       const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
       
-      // Only Generate Option 1
-      const opt1 = await generateSingleSketch(prompt, styles[0]);
+      // STANDARD GENERATION
+      const finalData = await generateSingleSketch(prompt, styles[0]);
+
+      // Finalize
       setSketchOptions(prev => {
         const newOpts = [...prev];
-        newOpts[0] = { status: 'loaded', data: opt1 };
+        newOpts[0] = { status: 'loaded', data: finalData };
         return newOpts;
       });
+      
+      // Only show bottom panel after generation is done and we have data
+      setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
 
     } catch (err) {
       console.error(err);
@@ -141,7 +146,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // New Handler for Image/PDF/DXF Uploads
+  // New Handler for Image/PDF/DXF Uploads (Non-streaming for now as it's atomic)
   const handleGenerateFromImage = useCallback(async (file: File) => {
     setIsGenerating(true);
     setError(null);
@@ -149,17 +154,16 @@ const App: React.FC = () => {
     setFuture([]);
     setSelection(null);
     
-    // Add a new loading option slot
     const newIdx = sketchOptions.length;
     setSketchOptions(prev => [...prev, { status: 'loading', id: `upload-${Date.now()}` }]);
     setCurrentOptionIndex(newIdx);
-    setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
+    // Hide bottom during load
+    setUiState(prev => ({ ...prev, bottomPanelOpen: false }));
 
     try {
         let sketch: SketchData;
 
         if (file.name.toLowerCase().endsWith('.dxf')) {
-           // Handle DXF Text Content
            const text = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader();
               reader.readAsText(file);
@@ -168,12 +172,10 @@ const App: React.FC = () => {
            });
            sketch = await generateSketchFromDXF(text);
         } else {
-           // Handle Image/PDF Base64
            const base64 = await new Promise<string>((resolve, reject) => {
                const reader = new FileReader();
                reader.readAsDataURL(file);
                reader.onload = () => {
-                   // Remove prefix (e.g. "data:image/png;base64,")
                    const result = reader.result as string;
                    const base64Data = result.split(',')[1];
                    resolve(base64Data);
@@ -188,10 +190,10 @@ const App: React.FC = () => {
             newOpts[newIdx] = { status: 'loaded', data: sketch };
             return newOpts;
         });
+        setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
     } catch (err) {
         console.error("Upload generation failed", err);
         setError(`Failed to analyze ${file.name}. Ensure it is a valid file.`);
-        // Remove failed option
         setSketchOptions(prev => prev.filter((_, i) => i !== newIdx));
     } finally {
         setIsGenerating(false);
@@ -201,6 +203,8 @@ const App: React.FC = () => {
   const handleGenerateOption = async (index: number) => {
     if (!lastPrompt) return;
     
+    setIsGenerating(true);
+
     setSketchOptions(prev => {
         const newOpts = [...prev];
         newOpts[index] = { status: 'loading', id: `opt-${index+1}` };
@@ -211,11 +215,12 @@ const App: React.FC = () => {
 
     try {
        const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
-       const newData = await generateSingleSketch(lastPrompt, styles[index]);
+       
+       const finalData = await generateSingleSketch(lastPrompt, styles[index]);
        
        setSketchOptions(prev => {
         const newOpts = [...prev];
-        newOpts[index] = { status: 'loaded', data: newData };
+        newOpts[index] = { status: 'loaded', data: finalData };
         return newOpts;
       });
     } catch (err) {
@@ -226,12 +231,15 @@ const App: React.FC = () => {
         newOpts[index] = { status: 'idle', id: `opt-${index+1}` };
         return newOpts;
       });
+    } finally {
+        setIsGenerating(false);
     }
   };
 
   // --- ITEM CRUD Handlers ---
 
   const handleUpdateItem = (id: string, type: 'room' | 'element', field: string, value: any) => {
+     if (isGenerating) return;
      const currentOption = sketchOptions[currentOptionIndex];
      if (currentOption?.status !== 'loaded') return;
      
@@ -247,13 +255,13 @@ const App: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string, type: 'room' | 'element') => {
+     if (isGenerating) return;
      const currentOption = sketchOptions[currentOptionIndex];
      if (currentOption?.status !== 'loaded') return;
 
      const newData = { ...currentOption.data };
      if (type === 'room') {
         newData.rooms = newData.rooms.filter(r => r.id !== id);
-        // Also delete contained elements
         newData.elements = newData.elements.filter(e => e.roomId !== id);
      } else {
         newData.elements = newData.elements.filter(e => e.id !== id);
@@ -263,11 +271,12 @@ const App: React.FC = () => {
   };
 
   const handleAddItem = (type: ElementType | RoomType, category: 'room' | 'element') => {
+     if (isGenerating) return;
      const currentOption = sketchOptions[currentOptionIndex];
      if (currentOption?.status !== 'loaded') return;
 
      const newData = { ...currentOption.data };
-     const center = { x: 500, y: 500 }; // Default, should calculate based on camera
+     const center = { x: 500, y: 500 };
 
      if (category === 'room') {
         const newRoom = {
@@ -308,12 +317,12 @@ const App: React.FC = () => {
 
   const currentOption = sketchOptions[currentOptionIndex];
   const currentSketchData = currentOption?.status === 'loaded' ? currentOption.data : null;
-  const isLoadingCurrent = currentOption?.status === 'loading' || currentOption?.status === 'pending';
-
-  const hasData = sketchOptions.length > 0;
+  
+  const hasLoadedData = sketchOptions.some(o => o.status === 'loaded');
 
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
+      
       {/* Header */}
       <header className="h-16 border-b-2 border-black bg-white flex items-center px-6 justify-between z-50 relative shadow-sm shrink-0">
         <div className="flex items-center gap-3">
@@ -346,37 +355,34 @@ const App: React.FC = () => {
         {/* CENTER CANVAS AREA */}
         <div className="flex-1 flex flex-col relative bg-gray-50 min-w-0 overflow-hidden">
           
-          {/* --- FLOATING TOGGLES (Absolute to Canvas Wrapper) --- */}
+          {/* --- FLOATING TOGGLES --- */}
           
           {/* Left Toggle */}
           <button 
             onClick={() => togglePanel('left')}
             className="absolute left-0 top-1/2 -translate-y-1/2 z-40 bg-white border-2 border-gray-200 border-l-0 py-3 px-1 rounded-r-lg shadow-md hover:bg-gray-50 hover:pl-2 transition-all flex items-center justify-center group"
-            title={uiState.leftPanelOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
-             {uiState.leftPanelOpen ? <ChevronLeft size={16} className="text-gray-600" /> : <ChevronRight size={16} className="text-gray-600" />}
+             {uiState.leftPanelOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
           </button>
 
-          {/* Right Toggle (Only if data exists) */}
-          {hasData && (
+          {/* Right Toggle - Only if loaded */}
+          {hasLoadedData && (
             <button 
                 onClick={() => togglePanel('right')}
                 className="absolute right-0 top-1/2 -translate-y-1/2 z-40 bg-white border-2 border-gray-200 border-r-0 py-3 px-1 rounded-l-lg shadow-md hover:bg-gray-50 hover:pr-2 transition-all flex items-center justify-center"
-                title={uiState.rightPanelOpen ? "Collapse Properties" : "Expand Properties"}
             >
-                {uiState.rightPanelOpen ? <ChevronRight size={16} className="text-gray-600" /> : <ChevronLeft size={16} className="text-gray-600" />}
+                {uiState.rightPanelOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
           )}
 
-          {/* Bottom Toggle (Only if data exists) */}
-          {hasData && (
+          {/* Bottom Toggle - Only if loaded */}
+          {hasLoadedData && (
              <button 
                onClick={() => togglePanel('bottom')}
                className="absolute left-1/2 -translate-x-1/2 z-50 bg-white border-2 border-gray-200 border-b-0 px-4 py-1 rounded-t-lg shadow-md hover:bg-gray-50 hover:pb-2 transition-all flex items-center justify-center group"
-               style={{ bottom: uiState.bottomPanelOpen ? '300px' : '0px' }}
-               title={uiState.bottomPanelOpen ? "Collapse Footer" : "Expand Footer"}
+               style={{ bottom: uiState.bottomPanelOpen ? '18vh' : '0px' }}
              >
-               {uiState.bottomPanelOpen ? <ChevronDown size={16} className="text-gray-600" /> : <ChevronUp size={16} className="text-gray-600" />}
+               {uiState.bottomPanelOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
              </button>
           )}
 
@@ -389,99 +395,107 @@ const App: React.FC = () => {
           )}
 
           {/* Canvas Area */}
-          <div className="flex-1 relative overflow-hidden">
-            <BlueprintCanvas 
-              data={currentSketchData} 
-              isLoading={isLoadingCurrent}
-              onUpdate={handleSketchUpdate}
-              historyControl={{
-                  undo: handleUndo,
-                  redo: handleRedo,
-                  canUndo: history.length > 0,
-                  canRedo: future.length > 0
-              }}
-              selectedId={selection?.id}
-              onSelect={(id, type) => {
-                  if (id && type) {
-                      setSelection({id, type});
-                      if (!uiState.rightPanelOpen) togglePanel('right'); // Auto-open right panel on select
-                  } else {
-                      setSelection(null);
-                  }
-              }}
-            />
-          </div>
+          <div className="absolute inset-0 flex flex-col h-full w-full">
+             <div className="flex-1 relative h-full overflow-hidden">
+                <BlueprintCanvas 
+                  data={currentSketchData} 
+                  isLoading={isGenerating && !hasLoadedData} // Only full page load if nothing loaded yet
+                  onUpdate={handleSketchUpdate}
+                  historyControl={{
+                      undo: handleUndo,
+                      redo: handleRedo,
+                      canUndo: history.length > 0,
+                      canRedo: future.length > 0
+                  }}
+                  selectedId={selection?.id}
+                  onSelect={(id, type) => {
+                      if (isGenerating) return;
+                      if (id && type) {
+                          setSelection({id, type});
+                          if (!uiState.rightPanelOpen) togglePanel('right');
+                      } else {
+                          setSelection(null);
+                      }
+                  }}
+                />
+             </div>
 
-          {/* Option Selector Footer (Collapsible) */}
-          <div className={`flex-none relative z-40 bg-white transition-all duration-300 ease-in-out border-black ${uiState.bottomPanelOpen ? 'h-[300px] opacity-100 border-t-2' : 'h-0 opacity-0 border-none'}`}>
-            {hasData && (
-                <div className="p-4 h-full overflow-y-auto">
-                  <div className="max-w-5xl mx-auto">
-                    <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-2 flex items-center gap-2 font-mono tracking-wider">
-                      <Grid size={12} /> Variation Selector
-                    </h3>
-                    <div className="flex gap-4 overflow-x-auto pb-2">
-                      {sketchOptions.map((opt, idx) => {
-                        const isActive = idx === currentOptionIndex;
-                        
-                        if (opt.status === 'loading') {
-                            return (
-                                <div key={idx} className="flex-1 min-w-[200px] h-[80px] p-3 border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center gap-2">
-                                    <Loader2 className="w-4 h-4 animate-spin text-black" />
-                                    <span className="text-xs text-gray-400 font-mono">GENERATING...</span>
-                                </div>
-                            );
-                        }
+             {/* Option Selector Footer */}
+             {hasLoadedData && (
+                <div 
+                    className={`relative z-40 bg-white transition-all duration-300 ease-in-out border-black ${
+                        uiState.bottomPanelOpen ? 'h-[18vh] opacity-100 border-t-2' : 'h-0 opacity-0 border-none'
+                    }`}
+                >
+                    <div className="p-2 h-full overflow-hidden">
+                      <div className="max-w-5xl mx-auto h-full flex flex-col">
+                        <h3 className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-2 font-mono tracking-wider shrink-0">
+                          <Grid size={12} /> Variation Selector
+                        </h3>
+                        <div className="flex gap-4 overflow-x-auto pb-2 h-full items-center">
+                          {sketchOptions.map((opt, idx) => {
+                            const isActive = idx === currentOptionIndex;
+                            
+                            if (opt.status === 'loading') {
+                                return (
+                                    <div key={idx} className="flex-1 min-w-[160px] h-[80%] p-3 border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center gap-2 rounded">
+                                        <Loader2 className="w-4 h-4 animate-spin text-black" />
+                                        <span className="text-xs text-gray-400 font-mono">THINKING...</span>
+                                    </div>
+                                );
+                            }
 
-                        if (opt.status === 'idle') {
-                          return (
-                              <button 
-                                key={idx}
-                                onClick={() => handleGenerateOption(idx)}
-                                className="flex-1 min-w-[200px] h-[80px] p-3 border-2 border-dashed border-gray-300 bg-white hover:border-black hover:bg-gray-50 flex flex-col items-center justify-center gap-1 transition-all group"
-                              >
-                                  <Plus className="w-5 h-5 text-gray-400 group-hover:text-black" />
-                                  <span className="text-[10px] font-bold text-gray-400 group-hover:text-black font-mono uppercase">Variation {idx + 1}</span>
-                              </button>
-                          );
-                        }
+                            if (opt.status === 'idle') {
+                              return (
+                                  <button 
+                                    key={idx}
+                                    onClick={() => handleGenerateOption(idx)}
+                                    className="flex-1 min-w-[160px] h-[80%] p-3 border-2 border-dashed border-gray-300 bg-white hover:border-black hover:bg-gray-50 flex flex-col items-center justify-center gap-1 transition-all group rounded"
+                                  >
+                                      <Plus className="w-5 h-5 text-gray-400 group-hover:text-black" />
+                                      <span className="text-[10px] font-bold text-gray-400 group-hover:text-black font-mono uppercase">Var {idx + 1}</span>
+                                  </button>
+                              );
+                            }
 
-                        if (opt.status === 'loaded') {
-                            return (
-                              <button
-                                key={opt.data.id}
-                                onClick={() => setCurrentOptionIndex(idx)}
-                                className={`group relative flex-1 min-w-[200px] p-3 border-2 text-left transition-all ${
-                                  isActive 
-                                    ? 'border-black bg-black text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]' 
-                                    : 'border-gray-200 hover:border-black bg-white text-black'
-                                }`}
-                              >
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className={`text-xs font-bold uppercase tracking-wide font-mono truncate max-w-[160px]`}>
-                                    {opt.data.title}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between text-[10px] font-mono opacity-80">
-                                  <span>{opt.data.totalAreaSqm} M²</span>
-                                  <span className="flex items-center gap-1">
-                                    VIEW <ArrowRight size={10} />
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                        }
-                        return null;
-                      })}
+                            if (opt.status === 'loaded') {
+                                return (
+                                  <button
+                                    key={opt.data.id}
+                                    onClick={() => setCurrentOptionIndex(idx)}
+                                    className={`group relative flex-1 min-w-[160px] h-[80%] p-3 border-2 text-left transition-all rounded ${
+                                      isActive 
+                                        ? 'border-black bg-black text-white shadow-md' 
+                                        : 'border-gray-200 hover:border-black bg-white text-black'
+                                    }`}
+                                  >
+                                    <div className="flex justify-between items-start mb-1">
+                                      <span className="text-xs font-bold uppercase tracking-wide font-mono truncate w-full">
+                                        {opt.data.title || `Design ${idx + 1}`}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] font-mono opacity-80 mt-2">
+                                      <span>{opt.data.totalAreaSqm} M²</span>
+                                      <span className="flex items-center gap-1">
+                                        {isActive ? 'ACTIVE' : 'LOAD'} <ArrowRight size={10} />
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                            }
+                            return null;
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  </div>
                 </div>
-              )}
+             )}
           </div>
+
         </div>
         
         {/* RIGHT PANEL */}
-        {hasData && (
+        {hasLoadedData && (
            <div className={`relative transition-all duration-300 ease-in-out bg-white z-20 ${uiState.rightPanelOpen ? 'w-80 border-l border-gray-200' : 'w-0 opacity-0 overflow-hidden'}`}>
                <RightSidePanel 
                   selection={selection}
