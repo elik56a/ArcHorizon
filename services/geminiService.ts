@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, Tool, Chat } from "@google/genai";
 import { SketchData } from '../types';
 
 // Initialize Gemini Client
@@ -7,6 +7,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export type DesignStyle = 'Modern' | 'Rustic' | 'Creative';
 
+// --- SCHEMA DEFINITIONS ---
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -67,10 +68,49 @@ const RESPONSE_SCHEMA = {
   required: ["id", "title", "description", "totalAreaSqm", "floors", "rooms", "elements"]
 };
 
+// --- TOOLS ---
+const PROPOSE_DESIGN_TOOL: FunctionDeclaration = {
+    name: 'propose_design',
+    description: 'Call this when you have gathered enough requirements from the user to generate a blueprint. Do not call this immediately. Ask questions first.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            summary: { type: Type.STRING, description: "A comprehensive architectural prompt summarizing all user requirements, style, and constraints." },
+            title: { type: Type.STRING, description: "A catchy title for the project." }
+        },
+        required: ['summary', 'title']
+    }
+};
+
+// --- ARCHITECT CHAT ---
+
+export const createArchitectSession = (): Chat => {
+    return ai.chats.create({
+        model: 'gemini-2.5-flash',
+        config: {
+            systemInstruction: `
+            ROLE: Senior Lead Architect & Design Consultant.
+            GOAL: Interview the client (user) to understand their vision before creating a blueprint.
+            
+            BEHAVIOR:
+            1. **DO NOT** generate a plan immediately. Start by asking about their vision.
+            2. **CONSULT**: Ask 1-2 targeted questions at a time (e.g., "What is the terrain like?", "How many bedrooms?", "Do you prefer open plan?").
+            3. **STYLE**: Ask about aesthetic preferences (Modern, Rustic, Industrial, etc.).
+            4. **IMAGES**: If the user provides images, analyze them for style cues and acknowledge them specificially.
+            5. **CONFIRMATION**: When you feel you have a solid grasp of the requirements (at least 3-4 data points: functionality, style, size, constraints), call the 'propose_design' tool.
+            
+            TONE: Professional, creative, encouraging, and inquisitive. Use architectural terminology but keep it accessible.
+            `,
+            tools: [{ functionDeclarations: [PROPOSE_DESIGN_TOOL] }]
+        }
+    });
+};
+
+
+// --- GENERATION FUNCTIONS ---
+
 export const generateSingleSketch = async (prompt: string, style: DesignStyle): Promise<SketchData> => {
   try {
-    const stylePrompt = getStyleInstruction(style);
-
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `
@@ -94,11 +134,6 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
       - Internal Walls: 10-15cm thickness implied.
       - Doors: Standard width 80-90cm. Entry door 100cm.
       - Windows: Align with furniture layouts (e.g., not behind a tall wardrobe).
-      
-      LAYOUT GUIDANCE:
-      - Create distinct 'zones' but allow flow.
-      - Use 'corridor' rooms to connect private areas.
-      - Ensure balconies ('balcony') are accessible via 'sliding_door' or 'door'.
       
       OUTPUT FORMAT: Pure JSON matching the schema.
       `,
@@ -137,9 +172,8 @@ export const generateSketchFromImage = async (base64Data: string, mimeType: stri
             
             REQUIREMENTS:
             1. **PRECISION**: Trace walls and rooms exactly.
-            2. **COMPONENT RECOGNITION**: Identify specific furniture (Toilets, Beds, Sofas) and use the correct 'type' enum (e.g., 'toilet', 'bed_queen').
+            2. **COMPONENT RECOGNITION**: Identify specific furniture (Toilets, Beds, Sofas) and use the correct 'type' enum.
             3. **SCALE**: Estimate scale based on standard door widths (90cm).
-            4. **DETAILS**: Include 'nightstand', 'wardrobe', 'kitchen_sink' if visible.
             `
           }
         ]
@@ -169,13 +203,7 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
             contents: `
             ACT AS: Senior CAD Interoperability Engineer.
             TASK: Convert DXF entities to a semantic Architectural JSON Schema.
-            
-            INPUT:
-            \`\`\`
-            ${contentSample}
-            \`\`\`
-            
-            INSTRUCTION: Extract Rooms and Furniture blocks. Map DXF blocks to specific types like 'toilet', 'bed_king', 'sofa'.
+            INPUT: \`\`\`${contentSample}\`\`\`
             `,
             config: {
                 responseMimeType: "application/json",
@@ -185,20 +213,9 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
 
         const text = response.text;
         if (!text) throw new Error("No response from AI");
-
         return JSON.parse(text) as SketchData;
-
     } catch (error) {
         console.error("AI DXF Parsing Error:", error);
         throw error;
     }
 }
-
-const getStyleInstruction = (style: DesignStyle): string => {
-  switch(style) {
-    case 'Modern': return "Style: CONTEMPORARY. Clean lines, open plan, large glazing, kitchen islands, master suites with walk-in wardrobes.";
-    case 'Rustic': return "Style: TRADITIONAL/COUNTRY. Distinct rooms, thick walls, cozy layout, large dining areas, fireplaces.";
-    case 'Creative': return "Style: ARCHITECTURAL AVANT-GARDE. Courtyards, L-shapes, U-shapes, indoor-outdoor flow, specific furniture detailing.";
-    default: return "Standard professional layout.";
-  }
-};
