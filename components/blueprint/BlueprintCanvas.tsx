@@ -90,7 +90,18 @@ const BlueprintCanvas: React.FC = () => {
     }
   }, [data?.id]);
 
-  useEffect(() => { if (viewMode === '2d') setShowAllFloors(false); }, [viewMode]);
+  // Logic to handle view mode switching
+  useEffect(() => { 
+      if (viewMode === '2d') {
+          // If we were showing all floors (Whole Building), reset to Floor 1 for 2D safety
+          if (showAllFloors) {
+              setActiveFloor(1);
+              setShowAllFloors(false);
+          } else {
+              setShowAllFloors(false);
+          }
+      }
+  }, [viewMode, showAllFloors]);
 
   const getBounds = (rooms: Room[]) => {
     if (rooms.length === 0) return { minX: 0, maxX: 1000, minY: 0, maxY: 1000 };

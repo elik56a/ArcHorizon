@@ -97,7 +97,8 @@ export const createArchitectSession = (): Chat => {
             2. **CONSULT**: Ask 1-2 targeted questions at a time (e.g., "What is the terrain like?", "How many bedrooms?", "Do you prefer open plan?").
             3. **STYLE**: Ask about aesthetic preferences (Modern, Rustic, Industrial, etc.).
             4. **IMAGES**: If the user provides images, analyze them for style cues and acknowledge them specificially.
-            5. **CONFIRMATION**: When you feel you have a solid grasp of the requirements (at least 3-4 data points: functionality, style, size, constraints), call the 'propose_design' tool.
+            5. **VERIFICATION**: Before calling 'propose_design', summarize the *exact* list of rooms and floors you are about to generate and ask the user to confirm.
+            6. **CONFIRMATION**: Once confirmed, call the 'propose_design' tool.
             
             TONE: Professional, creative, encouraging, and inquisitive. Use architectural terminology but keep it accessible.
             `,
@@ -116,6 +117,10 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
       contents: `
       ROLE: Senior Architectural CAD Technician.
       TASK: Generate a detailed construction-grade floor plan based on: "${prompt}".
+      
+      STRICT ADHERENCE PROTOCOL:
+      1. **NO HALLUCINATIONS**: Generate ONLY the rooms and floors explicitly requested in the prompt. Do not add extra bedrooms, bathrooms, or floors "just in case".
+      2. **EXACT COUNT**: If the prompt says "2 bedrooms", generate exactly 2.
       
       CRITICAL DESIGN STANDARDS:
       1. **REALISM**: Do not generate empty boxes. Every room must be furnished with specific CAD blocks.
@@ -146,7 +151,28 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
     const text = response.text;
     if (!text) throw new Error("No response from AI");
     
-    return JSON.parse(text) as SketchData;
+    const data = JSON.parse(text) as SketchData;
+
+    // SANITIZATION: Force numbers for critical fields to prevent UI bugs
+    data.floors = Number(data.floors) || 1;
+    data.rooms = data.rooms.map(r => ({
+        ...r,
+        floor: Number(r.floor) || 1,
+        x: Number(r.x),
+        y: Number(r.y),
+        width: Number(r.width),
+        height: Number(r.height)
+    }));
+    data.elements = data.elements.map(e => ({
+        ...e,
+        floor: Number(e.floor) || 1,
+        x: Number(e.x),
+        y: Number(e.y),
+        width: Number(e.width),
+        height: Number(e.height)
+    }));
+    
+    return data;
   } catch (error) {
     console.error(`AI Generation Error (${style}):`, error);
     throw error;
@@ -187,7 +213,13 @@ export const generateSketchFromImage = async (base64Data: string, mimeType: stri
     const text = response.text;
     if (!text) throw new Error("No response from AI");
 
-    return JSON.parse(text) as SketchData;
+    const data = JSON.parse(text) as SketchData;
+    // Sanitization for Image Gen as well
+    data.floors = Number(data.floors) || 1;
+    data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
+    data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
+    
+    return data;
   } catch (error) {
     console.error("AI Vision Error:", error);
     throw error;
@@ -213,7 +245,14 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
 
         const text = response.text;
         if (!text) throw new Error("No response from AI");
-        return JSON.parse(text) as SketchData;
+        const data = JSON.parse(text) as SketchData;
+        
+        // Sanitization for DXF Gen
+        data.floors = Number(data.floors) || 1;
+        data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
+        data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
+
+        return data;
     } catch (error) {
         console.error("AI DXF Parsing Error:", error);
         throw error;

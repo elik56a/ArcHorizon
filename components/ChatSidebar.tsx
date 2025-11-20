@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Attachment, ActionPayload } from '../types';
 import { THEME } from '../theme';
@@ -35,6 +36,9 @@ const ChatSidebar: React.FC = () => {
   const [chatAttachments, setChatAttachments] = useState<Attachment[]>([]);
   const chatFileRef = useRef<HTMLInputElement>(null);
 
+  // Auto-resize Textarea Ref
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // --- UPLOAD & FORM STATE ---
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -66,6 +70,17 @@ const ChatSidebar: React.FC = () => {
           chatSessionRef.current = createArchitectSession();
       }
   }, []);
+
+  // Auto-resize textarea effect
+  useEffect(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = `${Math.min(textarea.scrollHeight, 128)}px`;
+          // Only show scrollbar if content exceeds max height (128px)
+          textarea.style.overflowY = textarea.scrollHeight > 128 ? 'auto' : 'hidden';
+      }
+  }, [chatInput]);
 
   const handleChatFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) {
@@ -99,6 +114,11 @@ const ChatSidebar: React.FC = () => {
     setChatInput('');
     setChatAttachments([]);
     setIsChatting(true);
+
+    // Reset height immediately
+    if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+    }
 
     try {
         // 2. Construct Message Content
@@ -381,14 +401,14 @@ const ChatSidebar: React.FC = () => {
                </button>
                
                <textarea
+                ref={textareaRef}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                 placeholder="Describe your project or upload inspiration..."
                 disabled={isChatting}
-                className="w-full bg-transparent border-none p-2 text-sm focus:outline-none resize-none max-h-32 min-h-[44px]"
+                className="w-full bg-transparent border-none p-2 text-sm focus:outline-none resize-none max-h-32 min-h-[44px] overflow-hidden"
                 rows={1}
-                style={{ height: 'auto', minHeight: '44px' }} 
               />
               
               <button 
