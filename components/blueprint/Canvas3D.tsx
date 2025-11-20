@@ -47,13 +47,97 @@ const WALL_THICKNESS = 15; // cm
 const OPENING_THICKNESS = 22; // cm
 const FLOOR_PITCH = 300; // cm (Height difference between floors)
 
-interface Canvas3DProps {
-  data: SketchData;
-  activeFloor: number;
-  showAllFloors?: boolean;
-  onUpdate?: (data: SketchData) => void;
-  cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
+// --- WALL GENERATOR ---
+// Procedurally generates a wall with holes (windows/doors)
+interface Hole {
+  start: number;
+  width: number;
+  bottom: number;
+  height: number;
 }
+
+interface WallGeneratorProps {
+  length: number;
+  height: number;
+  thickness: number;
+  holes: Hole[];
+  position: [number, number, number]; // Center of the wall's BASE line
+  rotation: [number, number, number];
+}
+
+const WallGenerator: React.FC<WallGeneratorProps> = ({ length, height, thickness, holes, position, rotation }) => {
+  // Sort holes by position along the wall
+  const sortedHoles = [...holes].sort((a, b) => a.start - b.start);
+  
+  const segments = [];
+  let cursor = 0;
+
+  sortedHoles.forEach((hole, idx) => {
+      // 1. Solid wall before the hole
+      const solidLength = hole.start - cursor;
+      if (solidLength > 1) {
+          segments.push({
+              type: 'solid',
+              width: solidLength,
+              height: height,
+              x: cursor + solidLength / 2,
+              y: height / 2
+          });
+      }
+
+      // 2. Wall BELOW the hole (Sill)
+      if (hole.bottom > 1) {
+          segments.push({
+              type: 'sill',
+              width: hole.width,
+              height: hole.bottom,
+              x: hole.start + hole.width / 2,
+              y: hole.bottom / 2
+          });
+      }
+
+      // 3. Wall ABOVE the hole (Header)
+      const headerHeight = height - (hole.bottom + hole.height);
+      if (headerHeight > 1) {
+          segments.push({
+              type: 'header',
+              width: hole.width,
+              height: headerHeight,
+              x: hole.start + hole.width / 2,
+              y: height - headerHeight / 2
+          });
+      }
+
+      cursor = hole.start + hole.width;
+  });
+
+  // 4. Remaining solid wall after last hole
+  const remaining = length - cursor;
+  if (remaining > 1) {
+      segments.push({
+          type: 'solid',
+          width: remaining,
+          height: height,
+          x: cursor + remaining / 2,
+          y: height / 2
+      });
+  }
+
+  return (
+      <group position={position} rotation={rotation}>
+          {/* Offset to start from 0,0 instead of center */}
+          <group position={[-length / 2, 0, 0]}>
+            {segments.map((seg, i) => (
+                <mesh key={i} position={[seg.x, seg.y, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[seg.width, seg.height, thickness]} />
+                    <meshStandardMaterial color="white" roughness={0.8} />
+                </mesh>
+            ))}
+          </group>
+      </group>
+  );
+};
+
 
 // --- 3D COMPONENTS ---
 
@@ -220,6 +304,7 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
          case 'entry_door':
             return (
                <group position={[0, 70, 0]}>
+                   {/* Frame */}
                    <mesh position={[0, 0, -height/2 + 2]}>
                        <boxGeometry args={[width + 5, 200, 4]} />
                        <meshStandardMaterial color="#333" />
@@ -231,6 +316,12 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
                    <mesh position={[0, 98, 0]}>
                        <boxGeometry args={[width + 5, 4, height]} />
                        <meshStandardMaterial color="#333" />
+                   </mesh>
+                   {/* Door Panel (Open slightly) */}
+                   <mesh position={[-width/2 + 2, 0, 0]} rotation={[0, -0.5, 0]}>
+                       <boxGeometry args={[width, 200, 4]} />
+                       <meshStandardMaterial color="#555" />
+                       <Edges color="black" threshold={15} />
                    </mesh>
                </group>
             );
@@ -246,9 +337,10 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
                         <meshPhysicalMaterial 
                            color={color || "#88ccff"} 
                            roughness={0.0} 
-                           transmission={0.5} 
+                           transmission={0.6} 
                            transparent 
-                           opacity={0.6} 
+                           opacity={0.5} 
+                           thickness={2}
                         />
                     </mesh>
                 </group>
@@ -282,56 +374,145 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   );
 };
 
-const Room3D: React.FC<{ room: Room, yOffset: number }> = ({ room, yOffset }) => {
+const Room3D: React.FC<{ room: Room, elements: ArchitecturalElement[], yOffset: number }> = ({ room, elements, yOffset }) => {
   const { x, y, width, height, floorFinish, color, type } = room;
   const px = x + width / 2;
   const pz = y + height / 2;
-  const floorY = 0.5 + yOffset;
 
   const isGarden = type === 'garden';
   const isParking = type === 'parking';
+  const isPool = type === 'pool';
   const isBalcony = type === 'balcony' || type === 'terrace';
+
+  // --- ELEVATION LOGIC (Z-FIGHTING FIX) ---
+  // Hierarchy: Garden < Parking < Pool < Interior (Slab)
+  let elevation = 0.1;
+  if (isGarden) elevation = 0.1;
+  else if (isParking) elevation = 0.2;
+  else if (isPool) elevation = 0.3;
+  else elevation = 2.5; // Lift building slabs up
+
+  const floorY = elevation + yOffset;
 
   // Determine Floor Color
   let floorColor = '#f5f5f5';
   if (color) floorColor = color;
+  else if (isPool) floorColor = '#06b6d4'; // Cyan for Pool
   else if (isGarden) floorColor = '#4ade80'; // Green
   else if (isParking) floorColor = '#9ca3af'; // Asphalt Gray
   else if (floorFinish === 'wood') floorColor = '#d4a373';
   else if (floorFinish === 'tiled') floorColor = '#e0e0e0';
   else if (floorFinish === 'concrete') floorColor = '#999';
   
-  // Determine Wall Configuration
-  const hasWalls = !isGarden && !isParking;
-  const wallHeight = isBalcony ? 110 : WALL_HEIGHT; // Balcony walls are lower
-  
+  const hasWalls = !isGarden && !isParking && !isPool;
+  const wallHeight = isBalcony ? 110 : WALL_HEIGHT; 
+
+  // --- HOLE DETECTION LOGIC ---
+  const TOLERANCE = 20; 
+
+  const getHolesForWall = (wall: 'north' | 'south' | 'west' | 'east'): Hole[] => {
+      const holes: Hole[] = [];
+      elements.forEach(el => {
+          if (!['window', 'door', 'entry_door', 'balcony_door'].includes(el.type)) return;
+          
+          let isOnWall = false;
+          let start = 0;
+          let holeWidth = 0;
+          const isHorizontal = Math.abs(el.rotation) < 45 || Math.abs(el.rotation - 180) < 45;
+          
+          let bottom = 0;
+          let holeHeight = 210; 
+          if (el.type === 'window') {
+              bottom = 90; 
+              holeHeight = 110;
+          } else {
+              bottom = 0;
+          }
+
+          if (wall === 'north') { 
+             if (Math.abs(el.y - y) < TOLERANCE) {
+                 isOnWall = true;
+                 start = el.x - x;
+                 holeWidth = isHorizontal ? el.width : el.height; 
+             }
+          } else if (wall === 'south') { 
+             if (Math.abs((el.y) - (y + height)) < TOLERANCE || Math.abs((el.y + el.height) - (y + height)) < TOLERANCE) {
+                 if (Math.abs(el.y - (y+height)) < TOLERANCE) {
+                    isOnWall = true;
+                    start = el.x - x;
+                    holeWidth = isHorizontal ? el.width : el.height;
+                 }
+             }
+          } else if (wall === 'west') { 
+             if (Math.abs(el.x - x) < TOLERANCE) {
+                 isOnWall = true;
+                 start = el.y - y;
+                 holeWidth = isHorizontal ? el.height : el.width;
+             }
+          } else if (wall === 'east') { 
+             if (Math.abs((el.x) - (x + width)) < TOLERANCE || Math.abs((el.x + el.width) - (x + width)) < TOLERANCE) {
+                 if (Math.abs(el.x - (x+width)) < TOLERANCE) {
+                    isOnWall = true;
+                    start = el.y - y;
+                    holeWidth = isHorizontal ? el.height : el.width;
+                 }
+             }
+          }
+
+          if (isOnWall) {
+              holes.push({ start, width: holeWidth, bottom, height: holeHeight });
+          }
+      });
+      return holes;
+  };
+
   return (
     <group>
        {/* Floor Plane */}
        <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[px, floorY, pz]}>
           <planeGeometry args={[width, height]} />
-          <meshStandardMaterial color={floorColor} roughness={isGarden ? 1 : 0.5} />
+          <meshStandardMaterial 
+             color={floorColor} 
+             roughness={isPool ? 0.1 : (isGarden ? 1 : 0.5)} 
+             metalness={isPool ? 0.5 : 0}
+          />
        </mesh>
 
-       {/* Walls (Only for non-outdoor ground areas) */}
+       {/* Walls with Cutouts */}
        {hasWalls && (
-           <group>
-               <mesh castShadow receiveShadow position={[px, wallHeight/2 + yOffset, y]}>
-                  <boxGeometry args={[width + WALL_THICKNESS, wallHeight, WALL_THICKNESS]} />
-                  <meshStandardMaterial color="white" />
-               </mesh>
-               <mesh castShadow receiveShadow position={[px, wallHeight/2 + yOffset, y + height]}>
-                  <boxGeometry args={[width + WALL_THICKNESS, wallHeight, WALL_THICKNESS]} />
-                  <meshStandardMaterial color="white" />
-               </mesh>
-               <mesh castShadow receiveShadow position={[x, wallHeight/2 + yOffset, pz]}>
-                  <boxGeometry args={[WALL_THICKNESS, wallHeight, height - WALL_THICKNESS]} />
-                  <meshStandardMaterial color="white" />
-               </mesh>
-               <mesh castShadow receiveShadow position={[x + width, wallHeight/2 + yOffset, pz]}>
-                  <boxGeometry args={[WALL_THICKNESS, wallHeight, height - WALL_THICKNESS]} />
-                  <meshStandardMaterial color="white" />
-               </mesh>
+           <group position={[0, yOffset, 0]}>
+               <WallGenerator 
+                  length={width + WALL_THICKNESS} 
+                  height={wallHeight} 
+                  thickness={WALL_THICKNESS}
+                  holes={getHolesForWall('north')}
+                  position={[px, 0, y]} 
+                  rotation={[0, 0, 0]}
+               />
+               <WallGenerator 
+                  length={width + WALL_THICKNESS} 
+                  height={wallHeight} 
+                  thickness={WALL_THICKNESS}
+                  holes={getHolesForWall('south')}
+                  position={[px, 0, y + height]} 
+                  rotation={[0, 0, 0]}
+               />
+               <WallGenerator 
+                  length={height - WALL_THICKNESS} 
+                  height={wallHeight} 
+                  thickness={WALL_THICKNESS}
+                  holes={getHolesForWall('west')}
+                  position={[x, 0, pz]} 
+                  rotation={[0, Math.PI / 2, 0]}
+               />
+               <WallGenerator 
+                  length={height - WALL_THICKNESS} 
+                  height={wallHeight} 
+                  thickness={WALL_THICKNESS}
+                  holes={getHolesForWall('east')}
+                  position={[x + width, 0, pz]} 
+                  rotation={[0, Math.PI / 2, 0]}
+               />
            </group>
        )}
     </group>
@@ -483,6 +664,14 @@ const DragManager: React.FC<{
     );
 };
 
+interface Canvas3DProps {
+    data: SketchData;
+    activeFloor: number;
+    showAllFloors?: boolean;
+    onUpdate?: (data: SketchData) => void;
+    cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
+}
+
 const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
   const visibleRooms = showAllFloors ? data.rooms : data.rooms.filter(r => r.floor === activeFloor);
   const visibleElements = showAllFloors ? data.elements : data.elements.filter(e => e.floor === activeFloor);
@@ -519,6 +708,7 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = 
                     <Room3D 
                         key={room.id} 
                         room={room} 
+                        elements={visibleElements.filter(e => e.roomId === room.id || (e.floor === room.floor))} // Pass relevant elements
                         yOffset={(room.floor - 1) * FLOOR_PITCH} 
                     />
                   ))}

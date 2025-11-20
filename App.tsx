@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import ChatSidebar from './components/ChatSidebar';
 import BlueprintCanvas from './components/blueprint/BlueprintCanvas';
@@ -59,6 +60,7 @@ const App: React.FC = () => {
       <div className="fixed top-16 right-4 z-[60] flex flex-col gap-1 opacity-20 hover:opacity-100 transition-opacity group">
          <button onClick={() => loadMock('1-story')} className="bg-white border border-gray-300 text-[10px] font-bold px-2 py-1 hover:bg-black hover:text-white rounded shadow-sm">1-Story</button>
          <button onClick={() => loadMock('2-story')} className="bg-white border border-gray-300 text-[10px] font-bold px-2 py-1 hover:bg-black hover:text-white rounded shadow-sm">2-Story</button>
+         <button onClick={() => loadMock('3-story')} className="bg-white border border-gray-300 text-[10px] font-bold px-2 py-1 hover:bg-black hover:text-white rounded shadow-sm">3-Story</button>
       </div>
 
       {/* Main Workspace */}

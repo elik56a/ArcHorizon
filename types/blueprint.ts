@@ -2,7 +2,7 @@
 export type RoomType = 
   | 'bedroom' | 'living' | 'kitchen' | 'bathroom' | 'corridor' 
   | 'balcony' | 'storage' | 'dining' | 'entry' | 'stairs'
-  | 'garden' | 'parking' | 'terrace';
+  | 'garden' | 'parking' | 'terrace' | 'pool';
 
 export type FloorFinish = 'tiled' | 'wood' | 'carpet' | 'concrete' | 'grass' | 'paved';
 

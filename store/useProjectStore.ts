@@ -1,7 +1,8 @@
+
 import { create } from 'zustand';
 import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room } from '../types';
 import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from '../services/geminiService';
-import { MOCK_ONE_STORY, MOCK_TWO_STORY } from '../dev/mockData';
+import { MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY } from '../dev/mockData';
 
 interface ProjectState {
   // Data State
@@ -28,7 +29,7 @@ interface ProjectState {
   generateByPrompt: (prompt: string) => Promise<void>;
   generateByFile: (file: File) => Promise<void>;
   generateVariation: (index: number) => Promise<void>;
-  loadMock: (type: '1-story' | '2-story') => void;
+  loadMock: (type: '1-story' | '2-story' | '3-story') => void;
 
   // CRUD Actions (With History)
   updateItem: (id: string, type: 'room' | 'element', field: string, value: any) => void;
@@ -190,9 +191,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
   },
 
-  loadMock: (type: '1-story' | '2-story') => {
+  loadMock: (type: '1-story' | '2-story' | '3-story') => {
       set({ isGenerating: true, error: null, selection: null });
-      const mock = type === '1-story' ? MOCK_ONE_STORY : MOCK_TWO_STORY;
+      
+      let mock;
+      if (type === '1-story') mock = MOCK_ONE_STORY;
+      else if (type === '2-story') mock = MOCK_TWO_STORY;
+      else mock = MOCK_THREE_STORY;
       
       // Simulate delay for UX
       setTimeout(() => {

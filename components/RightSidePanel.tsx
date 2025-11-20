@@ -147,6 +147,7 @@ const RightSidePanel: React.FC = () => {
           case 'dining': return <Utensils size={20} />;
           case 'garden': return <Trees size={20} />;
           case 'parking': return <Car size={20} />;
+          case 'pool': return <Waves size={20} />;
           
           case 'door': return <DoorOpen size={20} />;
           case 'entry_door': return <DoorOpen size={20} strokeWidth={2.5} />;
@@ -169,7 +170,7 @@ const RightSidePanel: React.FC = () => {
       }
   };
 
-  const structuralZones = ['living', 'kitchen', 'bedroom', 'bathroom', 'dining', 'garden', 'parking'];
+  const structuralZones = ['living', 'kitchen', 'bedroom', 'bathroom', 'dining', 'garden', 'parking', 'pool'];
 
   const libraryCategories = {
      'Openings': ['door', 'window', 'entry_door', 'stairs_up'],

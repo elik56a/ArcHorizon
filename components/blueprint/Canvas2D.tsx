@@ -140,6 +140,10 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                <rect width="40" height="40" fill="#f3f4f6" />
                <path d="M 0 40 L 40 0" stroke="#d1d5db" strokeWidth="2" />
             </pattern>
+            <pattern id="water" width="20" height="20" patternUnits="userSpaceOnUse">
+                <rect width="20" height="20" fill="#a5f3fc" />
+                <path d="M 0 10 Q 5 5 10 10 T 20 10" stroke="#0891b2" fill="none" strokeWidth="0.5" />
+            </pattern>
           </defs>
 
           <g transform={`translate(${pan.x}, ${pan.y}) rotate(${rotation}) scale(${scale})`}>
@@ -151,6 +155,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                const isLiving = ['living', 'bedroom', 'dining'].includes(room.type);
                const isGarden = room.type === 'garden';
                const isParking = room.type === 'parking';
+               const isPool = room.type === 'pool';
                const isBalcony = room.type === 'balcony' || room.type === 'terrace';
 
                const isSelected = room.id === selectedId;
@@ -158,6 +163,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                // Determine Fill
                let fill = "none";
                if (room.color) fill = room.color;
+               else if (isPool) fill = "url(#water)";
                else if (isGarden) fill = "url(#grass)";
                else if (isParking) fill = "url(#parking)";
                else if (isBalcony) fill = "url(#tiles)";
@@ -165,8 +171,8 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                else if (isLiving) fill = "url(#wood)";
 
                // Determine Stroke (Walls)
-               const strokeColor = isSelected ? "#3b82f6" : (isGarden || isParking ? "#888" : "black");
-               const strokeWidth = isGarden || isParking ? 2 : WALL_STROKE_WIDTH;
+               const strokeColor = isSelected ? "#3b82f6" : (isGarden || isParking ? "#888" : (isPool ? "#0891b2" : "black"));
+               const strokeWidth = isGarden || isParking || isPool ? 2 : WALL_STROKE_WIDTH;
                
                return (
                 <g
