@@ -87,23 +87,159 @@ const App: React.FC = () => {
     });
   }, [currentOptionIndex, future]);
 
+  const handleUpdateItem = useCallback((id: string, type: 'room' | 'element', field: string, value: any) => {
+     if (isGenerating) return;
+     const currentOption = sketchOptions[currentOptionIndex];
+     if (currentOption?.status !== 'loaded') return;
+     
+     const newData = { 
+         ...currentOption.data,
+         rooms: [...currentOption.data.rooms],
+         elements: [...currentOption.data.elements]
+     };
+
+     if (type === 'room') {
+        newData.rooms = newData.rooms.map(r => r.id === id ? { ...r, [field]: value } : r);
+     } else {
+        newData.elements = newData.elements.map(e => e.id === id ? { ...e, [field]: value } : e);
+     }
+     handleSketchUpdate(newData);
+  }, [isGenerating, sketchOptions, currentOptionIndex, handleSketchUpdate]);
+
+  const handleDeleteItem = useCallback((id: string, type: 'room' | 'element') => {
+     if (isGenerating) return;
+     const currentOption = sketchOptions[currentOptionIndex];
+     if (currentOption?.status !== 'loaded') return;
+     
+     const newData = { ...currentOption.data };
+     if (type === 'room') {
+        newData.rooms = newData.rooms.filter(r => r.id !== id);
+        newData.elements = newData.elements.filter(e => e.roomId !== id);
+     } else {
+        newData.elements = newData.elements.filter(e => e.id !== id);
+     }
+     handleSketchUpdate(newData);
+     setSelection(null);
+  }, [isGenerating, sketchOptions, currentOptionIndex, handleSketchUpdate]);
+
+  const handleAddItem = useCallback((type: ElementType | RoomType, category: 'room' | 'element') => {
+     if (isGenerating) return;
+     const currentOption = sketchOptions[currentOptionIndex];
+     if (currentOption?.status !== 'loaded') return;
+     
+     const newData = { ...currentOption.data };
+     newData.rooms = [...newData.rooms];
+     newData.elements = [...newData.elements];
+
+     const center = { x: 500, y: 500 };
+     if (category === 'room') {
+        const newRoom = {
+           id: `room-${Date.now()}`,
+           name: 'New Room',
+           type: type as RoomType,
+           floor: 1,
+           x: center.x,
+           y: center.y,
+           width: 300,
+           height: 300,
+           floorFinish: 'wood' as const
+        };
+        newData.rooms.push(newRoom);
+        setSelection({ id: newRoom.id, type: 'room' });
+     } else {
+        const newEl = {
+           id: `el-${Date.now()}`,
+           roomId: 'none', 
+           type: type as ElementType,
+           floor: 1,
+           x: center.x + 50,
+           y: center.y + 50,
+           width: 100,
+           height: 100,
+           rotation: 0
+        };
+        if (type.includes('door')) { newEl.width = 90; newEl.height = 15; }
+        if (type === 'bed_king') { newEl.width = 180; newEl.height = 200; }
+        if (type === 'toilet') { newEl.width = 50; newEl.height = 70; }
+        
+        newData.elements.push(newEl);
+        setSelection({ id: newEl.id, type: 'element' });
+     }
+     handleSketchUpdate(newData);
+  }, [isGenerating, sketchOptions, currentOptionIndex, handleSketchUpdate]);
+
   // Keyboard Shortcuts
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          if (isGenerating) return; 
+          if (isGenerating) return;
+          
+          // Ignore if typing in an input
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+              return;
+          }
+
+          // Undo/Redo
           if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
               e.preventDefault();
               if (e.shiftKey) handleRedo();
               else handleUndo();
+              return;
           }
           if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
               e.preventDefault();
               handleRedo();
+              return;
+          }
+
+          // Selection Actions
+          if (selection) {
+              // Escape to Deselect
+              if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setSelection(null);
+                  return;
+              }
+
+              // Delete Selected Item
+              if (e.key === 'Delete' || e.key === 'Backspace') {
+                  e.preventDefault();
+                  handleDeleteItem(selection.id, selection.type);
+                  return;
+              }
+
+              // Move Selected Item with Arrows
+              if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                  e.preventDefault();
+                  const currentOption = sketchOptions[currentOptionIndex];
+                  if (currentOption?.status !== 'loaded') return;
+                  
+                  const data = currentOption.data;
+                  let item: any;
+                  if (selection.type === 'room') {
+                      item = data.rooms.find(r => r.id === selection.id);
+                  } else {
+                      item = data.elements.find(el => el.id === selection.id);
+                  }
+
+                  if (item) {
+                      const step = e.shiftKey ? 1 : 10; // Shift for fine tuning, otherwise 10 (grid)
+                      let field = 'x';
+                      let val = item.x;
+                      
+                      if (e.key === 'ArrowLeft') { field = 'x'; val = item.x - step; }
+                      if (e.key === 'ArrowRight') { field = 'x'; val = item.x + step; }
+                      if (e.key === 'ArrowUp') { field = 'y'; val = item.y - step; }
+                      if (e.key === 'ArrowDown') { field = 'y'; val = item.y + step; }
+
+                      handleUpdateItem(selection.id, selection.type, field, val);
+                  }
+              }
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo, isGenerating]);
+  }, [handleUndo, handleRedo, isGenerating, selection, sketchOptions, currentOptionIndex, handleDeleteItem, handleUpdateItem]);
 
   const handleGenerate = useCallback(async (prompt: string) => {
     setIsGenerating(true);
@@ -243,76 +379,6 @@ const App: React.FC = () => {
       }, 400);
   };
 
-  const handleUpdateItem = (id: string, type: 'room' | 'element', field: string, value: any) => {
-     if (isGenerating) return;
-     const currentOption = sketchOptions[currentOptionIndex];
-     if (currentOption?.status !== 'loaded') return;
-     const newData = { ...currentOption.data };
-     if (type === 'room') {
-        newData.rooms = newData.rooms.map(r => r.id === id ? { ...r, [field]: value } : r);
-     } else {
-        newData.elements = newData.elements.map(e => e.id === id ? { ...e, [field]: value } : e);
-     }
-     handleSketchUpdate(newData);
-  };
-
-  const handleDeleteItem = (id: string, type: 'room' | 'element') => {
-     if (isGenerating) return;
-     const currentOption = sketchOptions[currentOptionIndex];
-     if (currentOption?.status !== 'loaded') return;
-     const newData = { ...currentOption.data };
-     if (type === 'room') {
-        newData.rooms = newData.rooms.filter(r => r.id !== id);
-        newData.elements = newData.elements.filter(e => e.roomId !== id);
-     } else {
-        newData.elements = newData.elements.filter(e => e.id !== id);
-     }
-     handleSketchUpdate(newData);
-     setSelection(null);
-  };
-
-  const handleAddItem = (type: ElementType | RoomType, category: 'room' | 'element') => {
-     if (isGenerating) return;
-     const currentOption = sketchOptions[currentOptionIndex];
-     if (currentOption?.status !== 'loaded') return;
-     const newData = { ...currentOption.data };
-     const center = { x: 500, y: 500 };
-     if (category === 'room') {
-        const newRoom = {
-           id: `room-${Date.now()}`,
-           name: 'New Room',
-           type: type as RoomType,
-           floor: 1,
-           x: center.x,
-           y: center.y,
-           width: 300,
-           height: 300,
-           floorFinish: 'wood'
-        };
-        // @ts-ignore
-        newData.rooms.push(newRoom);
-        setSelection({ id: newRoom.id, type: 'room' });
-     } else {
-        const newEl = {
-           id: `el-${Date.now()}`,
-           roomId: 'none', 
-           type: type as ElementType,
-           floor: 1,
-           x: center.x + 50,
-           y: center.y + 50,
-           width: 100,
-           height: 100,
-           rotation: 0
-        };
-        if (type.includes('door')) { newEl.width = 90; newEl.height = 15; }
-        if (type === 'bed_king') { newEl.width = 180; newEl.height = 200; }
-        if (type === 'toilet') { newEl.width = 50; newEl.height = 70; }
-        newData.elements.push(newEl);
-        setSelection({ id: newEl.id, type: 'element' });
-     }
-     handleSketchUpdate(newData);
-  };
-
   const currentOption = sketchOptions[currentOptionIndex];
   const currentSketchData = currentOption?.status === 'loaded' ? currentOption.data : null;
   const hasLoadedData = sketchOptions.some(o => o.status === 'loaded');
@@ -381,7 +447,7 @@ const App: React.FC = () => {
              <button 
                onClick={() => togglePanel('bottom')}
                className="absolute left-1/2 -translate-x-1/2 z-50 bg-white border border-gray-200 border-b-0 px-4 py-0.5 shadow-lg hover:pb-1.5 transition-all rounded-t-md text-gray-400 hover:text-gray-900"
-               style={{ bottom: uiState.bottomPanelOpen ? '180px' : '0px' }}
+               style={{ bottom: uiState.bottomPanelOpen ? '140px' : '0px' }}
              >
                {uiState.bottomPanelOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
              </button>
@@ -419,11 +485,11 @@ const App: React.FC = () => {
                 />
              </div>
 
-             {/* Bottom Panel - NEW DESIGN */}
+             {/* Bottom Panel - COMPACT DESIGN */}
              {hasLoadedData && (
                 <div 
                     className={`relative z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 transition-all duration-300 ease-in-out ${
-                        uiState.bottomPanelOpen ? 'h-[180px] translate-y-0' : 'h-0 translate-y-full'
+                        uiState.bottomPanelOpen ? 'h-[140px] translate-y-0' : 'h-0 translate-y-full'
                     }`}
                 >
                     <div className="h-full w-full overflow-x-auto no-scrollbar px-8 flex items-center gap-4">
@@ -441,7 +507,7 @@ const App: React.FC = () => {
                             
                             if (opt.status === 'loading') {
                                 return (
-                                    <div key={idx} className="flex-shrink-0 w-64 h-28 p-4 rounded-lg border border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center gap-2 animate-pulse">
+                                    <div key={idx} className="flex-shrink-0 w-64 h-24 p-3 rounded-lg border border-gray-200 bg-gray-50/50 flex flex-col items-center justify-center gap-2 animate-pulse">
                                         <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                                         <span className="text-xs font-mono font-bold text-gray-400 uppercase">Processing...</span>
                                     </div>
@@ -453,7 +519,7 @@ const App: React.FC = () => {
                                   <button 
                                     key={idx}
                                     onClick={() => handleGenerateOption(idx)}
-                                    className="flex-shrink-0 w-64 h-28 rounded-lg border-2 border-dashed border-gray-300 bg-transparent hover:border-black hover:bg-gray-50 flex flex-col items-center justify-center gap-2 transition-all group"
+                                    className="flex-shrink-0 w-64 h-24 rounded-lg border-2 border-dashed border-gray-300 bg-transparent hover:border-black hover:bg-gray-50 flex flex-col items-center justify-center gap-2 transition-all group"
                                   >
                                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-black group-hover:text-white transition-all">
                                         <Plus size={16} className="text-gray-400 group-hover:text-white" />
@@ -468,7 +534,7 @@ const App: React.FC = () => {
                                   <button
                                     key={opt.data.id}
                                     onClick={() => setCurrentOptionIndex(idx)}
-                                    className={`flex-shrink-0 w-64 h-28 p-4 rounded-lg border-2 text-left flex flex-col justify-between transition-all relative overflow-hidden ${
+                                    className={`flex-shrink-0 w-64 h-24 p-3 rounded-lg border-2 text-left flex flex-col justify-between transition-all relative overflow-hidden ${
                                       isActive 
                                         ? 'border-black bg-black text-white shadow-lg scale-[1.02]' 
                                         : 'border-gray-200 bg-white text-gray-900 hover:border-gray-400 hover:shadow-md'
