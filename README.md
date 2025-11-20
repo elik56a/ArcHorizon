@@ -1,20 +1,58 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# ArcHorizon.ai
 
-# Run and deploy your AI Studio app
+ArcHorizon is an AI-powered architectural design platform that transforms text descriptions and rough sketches into professional, editable 2D/3D CAD blueprints.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1r4vBMk3VxGZVbOTkC_LpyDIhJzZAkA2p
+*   **Conversational AI Architect**: Consult with a specialized agent to refine your requirements.
+*   **Generative Design Engine**: Create detailed floor plans instantly.
+*   **2D/3D Editor**: Real-time visualization with professional CAD styling.
+*   **Export**: Download projects as DXF (AutoCAD), PDF, or SVG.
+*   **SaaS Platform**: Dashboard, History, and Project Management.
 
-## Run Locally
+## Getting Started
 
-**Prerequisites:**  Node.js
+### Prerequisites
 
+*   Node.js (v18+)
+*   Google Gemini API Key
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Installation
+
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Create a `.env` file in the root directory and add your API key:
+    ```env
+    API_KEY=your_google_gemini_api_key
+    ```
+
+### Development
+
+Start the local development server:
+
+```bash
+npm run dev
+```
+
+### Build
+
+Build for production:
+
+```bash
+npm run build
+```
+
+## Architecture
+
+*   **Frontend**: React, TypeScript, Vite
+*   **State Management**: Zustand
+*   **Styling**: Tailwind CSS
+*   **3D Engine**: Three.js / React Three Fiber
+*   **AI**: Google Gemini Multimodal API
+
+## License
+
+Proprietary software. All rights reserved.

@@ -4,7 +4,7 @@ export const Logo: React.FC<{ className?: string }> = ({ className }) => {
   return (
     <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Background Solid */}
-      <rect width="100" height="100" fill="black"/>
+      <rect width="100" height="100" fill="currentColor" className="text-black"/>
       
       {/* Architectural 'A' / Horizon Lines */}
       <path d="M20 80 L50 20 L80 80" stroke="white" strokeWidth="8" strokeLinecap="square"/>

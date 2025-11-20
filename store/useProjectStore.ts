@@ -11,6 +11,9 @@ interface ProjectState {
   history: SketchData[];
   future: SketchData[];
   
+  // Saved Projects (Database Mock)
+  savedSketches: SketchData[];
+  
   // Selection
   selection: Selection | null;
 
@@ -44,15 +47,43 @@ interface ProjectState {
   undo: () => void;
   redo: () => void;
   
+  // Persistence
+  saveCurrentSketch: () => void;
+  deleteSketch: (id: string) => void;
+  loadSketch: (id: string) => void;
+  createNewSketch: () => void;
+  
+  // Landing Page Flow
+  startProjectFromLanding: (prompt: string, preGeneratedData?: SketchData) => void;
+  
   // Helpers
   getCurrentSketch: () => SketchData | null;
 }
+
+// INTERNAL HELPER: Saves the current sketch to the savedSketches array automatically
+const autoSave = (state: ProjectState): Partial<ProjectState> => {
+    const currentOpt = state.sketchOptions[state.currentOptionIndex];
+    if (currentOpt?.status !== 'loaded') return {};
+    
+    const currentData = currentOpt.data;
+    const existingIndex = state.savedSketches.findIndex(s => s.id === currentData.id);
+    const newSaved = [...state.savedSketches];
+    
+    if (existingIndex >= 0) {
+        newSaved[existingIndex] = currentData;
+    } else {
+        newSaved.push(currentData);
+    }
+    
+    return { savedSketches: newSaved };
+};
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   sketchOptions: [],
   currentOptionIndex: 0,
   history: [],
   future: [],
+  savedSketches: [MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY], // Initial Mock DB
   selection: null,
   unitSystem: 'metric',
   isGenerating: false,
@@ -69,7 +100,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setUnitSystem: (unitSystem) => set({ unitSystem }),
   
   setCurrentOptionIndex: (index) => set((state) => {
-      // When switching variations, clear history to avoid mixing timelines
       return { currentOptionIndex: index, history: [], future: [], selection: null };
   }),
 
@@ -80,7 +110,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const prevOpt = newOpts[index];
     newOpts[index] = option;
 
-    // Handle History if this is a data commit (Loaded -> Loaded)
     if (prevOpt?.status === 'loaded' && option.status === 'loaded') {
         return { 
             sketchOptions: newOpts, 
@@ -90,8 +119,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
     return { sketchOptions: newOpts };
   }),
-
-  // --- ASYNC BUSINESS LOGIC ---
 
   generateByPrompt: async (prompt: string) => {
     set({ 
@@ -114,7 +141,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set((state) => {
              const newOpts = [...state.sketchOptions];
              newOpts[0] = { status: 'loaded', data: finalData };
-             return { isGenerating: false, sketchOptions: newOpts, history: [], future: [] };
+             // Trigger Auto Save after generation
+             const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+             return { isGenerating: false, sketchOptions: newOpts, history: [], future: [], ...autoSavedState };
         });
     } catch (err) {
         console.error(err);
@@ -124,12 +153,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   generateByFile: async (file: File) => {
       set({ isGenerating: true, error: null, selection: null });
-      
       const currentOpts = get().sketchOptions;
       const newIdx = currentOpts.length;
-      // Add new slot
       const newOpts = [...currentOpts, { status: 'loading', id: `upload-${Date.now()}` } as const];
-      
       set({ sketchOptions: newOpts as any, currentOptionIndex: newIdx });
 
       try {
@@ -155,7 +181,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         set((state) => {
             const updatedOpts = [...state.sketchOptions];
             updatedOpts[newIdx] = { status: 'loaded', data: sketch };
-            return { isGenerating: false, sketchOptions: updatedOpts, history: [], future: [] };
+            const autoSavedState = autoSave({ ...state, sketchOptions: updatedOpts, currentOptionIndex: newIdx } as ProjectState);
+            return { isGenerating: false, sketchOptions: updatedOpts, history: [], future: [], ...autoSavedState };
         });
 
     } catch (err) {
@@ -170,22 +197,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   generateVariation: async (index: number) => {
       const { lastPrompt, sketchOptions } = get();
       if (!lastPrompt) return;
-
       set({ isGenerating: true, error: null, selection: null, currentOptionIndex: index });
-
-      // Update specific option to loading
       const loadingOpts = [...sketchOptions];
       loadingOpts[index] = { status: 'loading', id: `opt-${index+1}` };
       set({ sketchOptions: loadingOpts });
-
       try {
          const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
          const finalData = await generateSingleSketch(lastPrompt, styles[index]);
-         
          set((state) => {
              const updatedOpts = [...state.sketchOptions];
              updatedOpts[index] = { status: 'loaded', data: finalData };
-             return { isGenerating: false, sketchOptions: updatedOpts };
+             const autoSavedState = autoSave({ ...state, sketchOptions: updatedOpts } as ProjectState);
+             return { isGenerating: false, sketchOptions: updatedOpts, ...autoSavedState };
          });
       } catch (err) {
          console.error(err);
@@ -199,91 +222,86 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   loadMock: (type: '1-story' | '2-story' | '3-story') => {
       set({ isGenerating: true, error: null, selection: null });
-      
       let mock;
       if (type === '1-story') mock = MOCK_ONE_STORY;
       else if (type === '2-story') mock = MOCK_TWO_STORY;
       else mock = MOCK_THREE_STORY;
-      
-      // Simulate delay for UX
       setTimeout(() => {
-          set({
-              isGenerating: false,
-              sketchOptions: [{ status: 'loaded', data: JSON.parse(JSON.stringify(mock)) }],
-              currentOptionIndex: 0,
-              history: [],
-              future: []
+          set((state) => {
+              const newOpts = [{ status: 'loaded', data: JSON.parse(JSON.stringify(mock)) }];
+              // Auto Save Mock Load
+              const tempState = { ...state, sketchOptions: newOpts as any[], currentOptionIndex: 0 };
+              const autoSavedState = autoSave(tempState);
+              
+              return {
+                  isGenerating: false,
+                  sketchOptions: newOpts as any[],
+                  currentOptionIndex: 0,
+                  history: [],
+                  future: [],
+                  ...autoSavedState
+              };
           });
       }, 400);
   },
 
-  // --- CRUD OPERATIONS ---
-
   updateItem: (id, type, field, value) => set((state) => {
       const currentOpt = state.sketchOptions[state.currentOptionIndex];
       if (currentOpt?.status !== 'loaded') return {};
-
       const currentData = currentOpt.data;
-      
-      // Push to history
       const newHistory = [...state.history, currentData];
-
-      // Create new data
       const newData = { 
           ...currentData,
           rooms: [...currentData.rooms],
           elements: [...currentData.elements]
       };
-
       if (type === 'room') {
          newData.rooms = newData.rooms.map(r => r.id === id ? { ...r, [field]: value } : r);
       } else {
          newData.elements = newData.elements.map(e => e.id === id ? { ...e, [field]: value } : e);
       }
-
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
-
-      return { sketchOptions: newOpts, history: newHistory, future: [] };
+      
+      // AUTO SAVE
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+      
+      return { sketchOptions: newOpts, history: newHistory, future: [], ...autoSavedState };
   }),
 
   deleteItem: (id, type) => set((state) => {
       const currentOpt = state.sketchOptions[state.currentOptionIndex];
       if (currentOpt?.status !== 'loaded') return {};
-
       const currentData = currentOpt.data;
       const newHistory = [...state.history, currentData];
-
       const newData = { ...currentData };
       if (type === 'room') {
          newData.rooms = newData.rooms.filter(r => r.id !== id);
-         newData.elements = newData.elements.filter(e => e.roomId !== id); // Cascade delete
+         newData.elements = newData.elements.filter(e => e.roomId !== id);
       } else {
          newData.elements = newData.elements.filter(e => e.id !== id);
       }
-
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
+      
+      // AUTO SAVE
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
-      return { sketchOptions: newOpts, history: newHistory, future: [], selection: null };
+      return { sketchOptions: newOpts, history: newHistory, future: [], selection: null, ...autoSavedState };
   }),
 
   addItem: (type, category) => set((state) => {
       const currentOpt = state.sketchOptions[state.currentOptionIndex];
       if (currentOpt?.status !== 'loaded') return {};
-
       const currentData = currentOpt.data;
       const newHistory = [...state.history, currentData];
-      
       const newData = { 
           ...currentData,
           rooms: [...currentData.rooms],
           elements: [...currentData.elements]
       };
-
       const center = { x: 500, y: 500 }; 
       let newSelection: Selection | null = null;
-
       if (category === 'room') {
           const newRoom: Room = {
               id: `room-${Date.now()}`,
@@ -310,48 +328,102 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               height: 100,
               rotation: 0
           };
-          // Defaults
           if (type.toString().includes('door')) { newEl.width = 90; newEl.height = 15; }
           if (type === 'bed_king') { newEl.width = 180; newEl.height = 200; }
           if (type === 'toilet') { newEl.width = 50; newEl.height = 70; }
-          
           newData.elements.push(newEl);
           newSelection = { id: newEl.id, type: 'element' };
       }
-
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
+      
+      // AUTO SAVE
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
-      return { sketchOptions: newOpts, history: newHistory, future: [], selection: newSelection };
+      return { sketchOptions: newOpts, history: newHistory, future: [], selection: newSelection, ...autoSavedState };
   }),
-
-  // --- UNDO / REDO ---
 
   undo: () => set((state) => {
       const currentOpt = state.sketchOptions[state.currentOptionIndex];
       if (currentOpt?.status !== 'loaded' || state.history.length === 0) return {};
-
       const previous = state.history[state.history.length - 1];
       const newHistory = state.history.slice(0, -1);
       const newFuture = [currentOpt.data, ...state.future];
-
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: previous };
-
-      return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null };
+      
+      // AUTO SAVE
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+      
+      return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null, ...autoSavedState };
   }),
 
   redo: () => set((state) => {
       const currentOpt = state.sketchOptions[state.currentOptionIndex];
       if (currentOpt?.status !== 'loaded' || state.future.length === 0) return {};
-
       const next = state.future[0];
       const newFuture = state.future.slice(1);
       const newHistory = [...state.history, currentOpt.data];
-
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: next };
+      
+      // AUTO SAVE
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
-      return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null };
-  })
+      return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null, ...autoSavedState };
+  }),
+
+  // DB ACTIONS (Manual Save trigger, effectively redundant now but kept for explicit UI actions if needed)
+  saveCurrentSketch: () => set((state) => {
+      return autoSave(state);
+  }),
+
+  deleteSketch: (id) => set((state) => ({
+      savedSketches: state.savedSketches.filter(s => s.id !== id)
+  })),
+
+  loadSketch: (id) => {
+      const sketch = get().savedSketches.find(s => s.id === id);
+      if (sketch) {
+          set({
+              sketchOptions: [{ status: 'loaded', data: JSON.parse(JSON.stringify(sketch)) }],
+              currentOptionIndex: 0,
+              history: [],
+              future: []
+          });
+      }
+  },
+
+  createNewSketch: () => {
+      set({
+          sketchOptions: [],
+          currentOptionIndex: 0,
+          history: [],
+          future: [],
+          selection: null,
+          isGenerating: false,
+          error: null
+      });
+  },
+
+  // LANDING PAGE INIT ACTION
+  startProjectFromLanding: (prompt, preGeneratedData) => {
+      set({
+          lastPrompt: prompt,
+          currentOptionIndex: 0,
+          sketchOptions: preGeneratedData 
+            ? [{ status: 'loaded', data: preGeneratedData }]
+            : [],
+          history: [],
+          future: []
+      });
+      
+      if (preGeneratedData) {
+           // Ensure the preview is saved so it appears in dashboard
+           set(state => autoSave(state));
+      } else {
+           // If only prompt, trigger generation immediately
+           get().generateByPrompt(prompt);
+      }
+  }
 }));

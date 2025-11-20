@@ -89,49 +89,85 @@ export const MOCK_TWO_STORY: SketchData = {
     ]
 };
 
-// --- MOCK 3: URBAN VERTICAL GARDEN (3-STORY) ---
+// --- MOCK 3: STUNNING MODERN VILLA (3-STORY) ---
 export const MOCK_THREE_STORY: SketchData = {
-    id: 'mock-3-urban',
-    title: 'Urban Vertical Garden',
-    description: 'Luxury 3-story townhouse optimized for vertical living with ground floor pool oasis.',
-    totalAreaSqm: 450,
+    id: 'mock-3-villa',
+    title: 'The Azure Horizon Villa',
+    description: 'A masterpiece of modern architecture featuring cantilevered floors, extensive glass facades, and a seamless indoor-outdoor flow.',
+    totalAreaSqm: 680,
     floors: 3,
     rooms: [
-        // FLOOR 1 (Ground) - OASIS
-        { id: 'f1_drive', name: 'Parking', type: 'parking', floor: 1, x: 600, y: 1000, width: 600, height: 600, floorFinish: 'paved' },
-        { id: 'f1_garden', name: 'Oasis Garden', type: 'garden', floor: 1, x: 1000, y: 800, width: 800, height: 800, floorFinish: 'grass' },
-        { id: 'f1_pool', name: 'Plunge Pool', type: 'pool', floor: 1, x: 1200, y: 1000, width: 400, height: 300, floorFinish: 'tiled' },
+        // --- FLOOR 1: SOCIAL & LANDSCAPE ---
+        { id: 'f1_landscape', name: 'Estate Grounds', type: 'garden', floor: 1, x: -500, y: -500, width: 3500, height: 3000, floorFinish: 'grass' },
+        { id: 'f1_pool', name: 'Infinity Pool', type: 'pool', floor: 1, x: 1400, y: 800, width: 1000, height: 600, floorFinish: 'tiled' },
+        { id: 'f1_deck', name: 'Sun Deck', type: 'garden', floor: 1, x: 1400, y: 400, width: 1000, height: 400, floorFinish: 'paved' },
+        { id: 'f1_parking', name: 'Luxury Garage', type: 'parking', floor: 1, x: 200, y: 200, width: 700, height: 800, floorFinish: 'paved' },
+        
+        { id: 'f1_foyer', name: 'Grand Foyer', type: 'entry', floor: 1, x: 900, y: 200, width: 500, height: 400, floorFinish: 'marble', color: '#fdfdfd' },
+        { id: 'f1_living', name: 'Formal Living', type: 'living', floor: 1, x: 900, y: 600, width: 800, height: 700, floorFinish: 'wood', color: '#fff' },
+        { id: 'f1_dining', name: 'Banquet Hall', type: 'dining', floor: 1, x: 1700, y: 600, width: 600, height: 500, floorFinish: 'marble', color: '#fafafa' },
+        { id: 'f1_kitchen', name: 'Chef Kitchen', type: 'kitchen', floor: 1, x: 1700, y: 200, width: 600, height: 400, floorFinish: 'tiled', color: '#f5f5f5' },
+        { id: 'f1_cinema', name: 'Home Cinema', type: 'living', floor: 1, x: 200, y: 1000, width: 700, height: 600, floorFinish: 'carpet', color: '#1a1a1a' },
 
-        { id: 'f1_entry', name: 'Lobby', type: 'entry', floor: 1, x: 600, y: 600, width: 400, height: 400, floorFinish: 'tiled' },
-        { id: 'f1_gym', name: 'Home Gym', type: 'bedroom', floor: 1, x: 1000, y: 600, width: 400, height: 400, floorFinish: 'wood' },
-        { id: 'f1_stairs', name: 'Core', type: 'stairs', floor: 1, x: 600, y: 400, width: 400, height: 200, floorFinish: 'concrete' },
+        // --- FLOOR 2: FAMILY & SUITES ---
+        { id: 'f2_corridor', name: 'Gallery Bridge', type: 'corridor', floor: 2, x: 900, y: 200, width: 1400, height: 300, floorFinish: 'wood' },
+        { id: 'f2_bed1', name: 'Guest Suite', type: 'bedroom', floor: 2, x: 900, y: 500, width: 500, height: 600, floorFinish: 'wood' },
+        { id: 'f2_bed2', name: 'Kids Suite', type: 'bedroom', floor: 2, x: 1400, y: 500, width: 500, height: 600, floorFinish: 'wood' },
+        { id: 'f2_bath', name: 'Family Bath', type: 'bathroom', floor: 2, x: 1900, y: 500, width: 400, height: 400, floorFinish: 'tiled' },
+        { id: 'f2_gym', name: 'Fitness Studio', type: 'bedroom', floor: 2, x: 200, y: 500, width: 700, height: 500, floorFinish: 'wood' },
+        { id: 'f2_terrace', name: 'Lounge Terrace', type: 'balcony', floor: 2, x: 900, y: 1100, width: 1400, height: 300, floorFinish: 'tiled' },
 
-        // FLOOR 2 (Living)
-        { id: 'f2_stairs', name: 'Core', type: 'stairs', floor: 2, x: 600, y: 400, width: 400, height: 200, floorFinish: 'concrete' },
-        { id: 'f2_living', name: 'Main Living', type: 'living', floor: 2, x: 600, y: 600, width: 800, height: 600, floorFinish: 'wood' },
-        { id: 'f2_kitchen', name: 'Galley Kitchen', type: 'kitchen', floor: 2, x: 1000, y: 400, width: 400, height: 200, floorFinish: 'tiled' },
-        { id: 'f2_balcony', name: 'Terrace', type: 'balcony', floor: 2, x: 600, y: 1200, width: 800, height: 200, floorFinish: 'tiled' },
-
-        // FLOOR 3 (Private)
-        { id: 'f3_stairs', name: 'Core', type: 'stairs', floor: 3, x: 600, y: 400, width: 400, height: 200, floorFinish: 'concrete' },
-        { id: 'f3_master', name: 'Master Bed', type: 'bedroom', floor: 3, x: 600, y: 600, width: 500, height: 500, floorFinish: 'carpet' },
-        { id: 'f3_bath', name: 'Master Bath', type: 'bathroom', floor: 3, x: 1100, y: 600, width: 300, height: 500, floorFinish: 'tiled' },
-        { id: 'f3_roof', name: 'Roof Garden', type: 'garden', floor: 3, x: 600, y: 1100, width: 800, height: 400, floorFinish: 'grass' },
+        // --- FLOOR 3: MASTER RETREAT ---
+        { id: 'f3_master', name: 'Master Bedroom', type: 'bedroom', floor: 3, x: 1200, y: 400, width: 800, height: 600, floorFinish: 'carpet', color: '#f9fafb' },
+        { id: 'f3_walkin', name: 'Walk-in Closet', type: 'storage', floor: 3, x: 2000, y: 400, width: 400, height: 600, floorFinish: 'wood' },
+        { id: 'f3_ensuite', name: 'Spa Bath', type: 'bathroom', floor: 3, x: 800, y: 400, width: 400, height: 600, floorFinish: 'marble' },
+        { id: 'f3_roof', name: 'Roof Terrace', type: 'balcony', floor: 3, x: 800, y: 1000, width: 1600, height: 600, floorFinish: 'tiled' },
     ],
     connections: [],
     elements: [
-        // F1
-        { id: 'f1_door', roomId: 'f1_entry', type: 'entry_door', floor: 1, x: 800, y: 1000, width: 120, height: 15, rotation: 0 },
-        { id: 'f1_st_up', roomId: 'f1_stairs', type: 'stairs_up', floor: 1, x: 700, y: 450, width: 200, height: 100, rotation: 0 },
-        { id: 'f1_gym_door', roomId: 'f1_gym', type: 'door', floor: 1, x: 1200, y: 1000, width: 90, height: 15, rotation: 0 }, // Door to pool
+        // --- FLOOR 1 ELEMENTS ---
+        // Grand Entrance
+        { id: 'f1_door_main', roomId: 'f1_foyer', type: 'entry_door', floor: 1, x: 1100, y: 200, width: 180, height: 15, rotation: 0 },
+        // Living Area
+        { id: 'f1_sofa_l', roomId: 'f1_living', type: 'sofa_l_shape', floor: 1, x: 1000, y: 800, width: 400, height: 200, rotation: 180 },
+        { id: 'f1_coffee', roomId: 'f1_living', type: 'coffee_table', floor: 1, x: 1150, y: 900, width: 150, height: 80, rotation: 0 },
+        { id: 'f1_tv_wall', roomId: 'f1_living', type: 'tv_unit', floor: 1, x: 1000, y: 1280, width: 400, height: 50, rotation: 0 },
+        // Glass Walls (Windows)
+        { id: 'f1_win_pool', roomId: 'f1_living', type: 'window', floor: 1, x: 1700, y: 800, width: 15, height: 400, rotation: 90 },
+        { id: 'f1_win_deck', roomId: 'f1_dining', type: 'window', floor: 1, x: 2000, y: 1100, width: 300, height: 15, rotation: 0 },
+        // Kitchen
+        { id: 'f1_island', roomId: 'f1_kitchen', type: 'kitchen_island', floor: 1, x: 1900, y: 350, width: 300, height: 120, rotation: 0 },
+        { id: 'f1_stove', roomId: 'f1_kitchen', type: 'stove', floor: 1, x: 2100, y: 200, width: 80, height: 60, rotation: 180 },
+        { id: 'f1_dining_tab', roomId: 'f1_dining', type: 'dining_table', floor: 1, x: 1900, y: 800, width: 300, height: 120, rotation: 90 },
         
-        // F2
-        { id: 'f2_st_up', roomId: 'f2_stairs', type: 'stairs_up', floor: 2, x: 700, y: 450, width: 200, height: 100, rotation: 0 },
-        { id: 'f2_sofa', roomId: 'f2_living', type: 'sofa', floor: 2, x: 800, y: 800, width: 300, height: 100, rotation: 0 },
-        { id: 'f2_win', roomId: 'f2_living', type: 'window', floor: 2, x: 600, y: 800, width: 15, height: 300, rotation: 90 },
+        // Stairs F1
+        { id: 'f1_st', roomId: 'f1_foyer', type: 'stairs_up', floor: 1, x: 950, y: 400, width: 150, height: 300, rotation: 270 },
+
+        // --- FLOOR 2 ELEMENTS ---
+        // Stairs F2
+        { id: 'f2_st', roomId: 'f2_corridor', type: 'stairs_up', floor: 2, x: 950, y: 400, width: 150, height: 300, rotation: 270 },
+        // Guest Suite
+        { id: 'f2_bed1', roomId: 'f2_bed1', type: 'bed_queen', floor: 2, x: 1100, y: 600, width: 160, height: 200, rotation: 0 },
+        { id: 'f2_win_bed1', roomId: 'f2_bed1', type: 'window', floor: 2, x: 1100, y: 1100, width: 200, height: 15, rotation: 0 },
+        // Kids Suite
+        { id: 'f2_bed2', roomId: 'f2_bed2', type: 'bed_single', floor: 2, x: 1500, y: 600, width: 100, height: 200, rotation: 0 },
+        { id: 'f2_bed3', roomId: 'f2_bed2', type: 'bed_single', floor: 2, x: 1700, y: 600, width: 100, height: 200, rotation: 0 },
+        // Bathroom
+        { id: 'f2_tub', roomId: 'f2_bath', type: 'bathtub', floor: 2, x: 2100, y: 600, width: 80, height: 180, rotation: 0 },
+        { id: 'f2_sink', roomId: 'f2_bath', type: 'sink_double', floor: 2, x: 2000, y: 500, width: 150, height: 60, rotation: 180 },
+
+        // --- FLOOR 3 ELEMENTS ---
+        // Stairs F3
+        { id: 'f3_st', roomId: 'f3_ensuite', type: 'stairs_down', floor: 3, x: 950, y: 400, width: 150, height: 300, rotation: 270 },
+        // Master Bed
+        { id: 'f3_bed_m', roomId: 'f3_master', type: 'bed_king', floor: 3, x: 1500, y: 500, width: 220, height: 220, rotation: 0 },
+        { id: 'f3_sofa_m', roomId: 'f3_master', type: 'sofa', floor: 3, x: 1500, y: 900, width: 200, height: 80, rotation: 180 },
+        // Master Windows (Panoramic)
+        { id: 'f3_win_m1', roomId: 'f3_master', type: 'window', floor: 3, x: 1200, y: 1000, width: 800, height: 15, rotation: 0 },
+        // Master Bath
+        { id: 'f3_tub_m', roomId: 'f3_ensuite', type: 'bathtub', floor: 3, x: 850, y: 800, width: 100, height: 180, rotation: 0 },
         
-        // F3
-        { id: 'f3_bed', roomId: 'f3_master', type: 'bed_king', floor: 3, x: 700, y: 700, width: 200, height: 200, rotation: 0 },
-        { id: 'f3_tub', roomId: 'f3_bath', type: 'bathtub', floor: 3, x: 1200, y: 700, width: 80, height: 170, rotation: 0 },
+        // Roof Deck
+        { id: 'f3_lounge', roomId: 'f3_roof', type: 'sofa_l_shape', floor: 3, x: 1800, y: 1200, width: 300, height: 300, rotation: 0 },
     ]
 };
