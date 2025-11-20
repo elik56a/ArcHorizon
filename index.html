@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -5,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ArcHorizon.ai</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
@@ -13,23 +15,35 @@
               blueprint: {
                 50: '#f0f4f8',
                 100: '#d9e2ec',
-                200: '#bcccdc',
                 500: '#334e68',
-                600: '#243b53',
-                700: '#102a43',
-                800: '#091d30', // Blueprint dark blue
                 900: '#05121e',
               },
-              paper: '#f7f9fc',
+              paper: '#ffffff', 
+              ink: '#000000',
             },
             fontFamily: {
-              mono: ['Courier New', 'monospace'],
+              mono: ['"JetBrains Mono"', 'monospace'],
               sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+            boxShadow: {
+              'hard': '4px 4px 0px 0px rgba(0,0,0,1)',
+              'hard-sm': '2px 2px 0px 0px rgba(0,0,0,1)',
             }
           },
         },
       };
     </script>
+    <style>
+      /* Hide scrollbar for Chrome, Safari and Opera */
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      /* Hide scrollbar for IE, Edge and Firefox */
+      .no-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+      }
+    </style>
     <script type="importmap">
 {
   "imports": {
@@ -49,7 +63,7 @@
 }
 </script>
   </head>
-  <body class="bg-gray-50 text-gray-900 h-screen overflow-hidden">
+  <body class="bg-gray-50 text-gray-900 h-screen overflow-hidden font-sans">
     <div id="root"></div>
   </body>
 </html>

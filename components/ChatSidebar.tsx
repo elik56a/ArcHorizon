@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
-import { Send, Loader2, Bot, User, MessageSquare, ClipboardList, Plus, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileText, X, Image as ImageIcon, FileCode } from 'lucide-react';
+import { THEME } from '../theme';
+import { Send, Loader2, MessageSquare, ClipboardList, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileText, X, Image as ImageIcon, FileCode, Bot, User, ArrowRight } from 'lucide-react';
 
 interface InputPanelProps {
   onGenerate: (prompt: string) => void;
@@ -19,7 +20,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hi! I\'m ArcHorizon. Describe your project to generate professional layouts. (e.g., "A 2-story duplex with 3 bedrooms and a garden").',
+      content: 'Hello! I am your AI Architect. Describe your dream project or use the specification form to get started.',
       timestamp: Date.now()
     }
   ]);
@@ -32,348 +33,249 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
 
   // Form State
   const [formData, setFormData] = useState({
-    // Core Specs
-    unit: 'Metric (m²)' as 'Metric (m²)' | 'Imperial (sq ft)',
-    buildingType: 'Apartment',
-    area: 120,
-    floors: 1,
-    ceilingHeight: 2.8,
-    roofType: 'Modern Flat' as 'Modern Flat' | 'Tiled/Pitched', // NEW
-    
-    // Spaces
-    bedrooms: 2,
-    bathrooms: 1,
-    hasLivingRoom: true,
-    hasKitchen: true,
-    hasDining: true,
-    hasStudy: false,
-    
-    // Outdoor & Amenities
-    hasBalcony: false,
-    hasGarden: false,
-    hasParking: false,
-    hasStorage: false,
-    
-    // Style
-    designStyle: 'Modern' as 'Modern' | 'Rustic' | 'Creative',
-    customNotes: ''
+    unit: 'Metric (m²)', buildingType: 'Apartment', area: 120, floors: 1, ceilingHeight: 2.8,
+    roofType: 'Modern Flat', bedrooms: 2, bathrooms: 1,
+    hasLivingRoom: true, hasKitchen: true, hasDining: true, hasStudy: false,
+    hasBalcony: false, hasGarden: false, hasParking: false, hasStorage: false,
+    designStyle: 'Modern', customNotes: ''
   });
 
-  // Accordion State
-  const [sections, setSections] = useState({
-    specs: true,
-    rooms: false,
-    outdoor: false,
-    style: false
-  });
+  const [sections, setSections] = useState({ specs: true, rooms: false, outdoor: false, style: false });
+  const toggleSection = (key: keyof typeof sections) => setSections(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const toggleSection = (key: keyof typeof sections) => {
-    setSections(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(() => scrollToBottom(), [messages]);
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isGenerating) return;
-
     const userMsg: Message = { role: 'user', content: chatInput, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
-    
     onGenerate(chatInput);
     setChatInput('');
-    setMessages(prev => [...prev, { role: 'assistant', content: 'Analyzing requirements and generating options...', timestamp: Date.now() + 1 }]);
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Designing...', timestamp: Date.now() + 1 }]);
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isGenerating) return;
-
-    // Construct high-fidelity prompt
     let prompt = `Generate a ${formData.designStyle} ${formData.buildingType} with ${formData.floors} floor(s). `;
-    
-    // Private House Specifics
-    const isPrivateHouse = ['Villa', 'Duplex', 'Cottage'].includes(formData.buildingType);
-    if (isPrivateHouse) {
-        prompt += `Roof Style: ${formData.roofType}. `;
-    }
-
-    prompt += `Total Area: ${formData.area} ${formData.unit}. `;
-    prompt += `Ceiling Height: ${formData.ceilingHeight}m. `;
-    
-    prompt += `\n\nRequired Spaces:\n`;
-    prompt += `- Bedrooms: ${formData.bedrooms}\n`;
-    prompt += `- Bathrooms: ${formData.bathrooms}\n`;
-    if (formData.hasLivingRoom) prompt += `- Open Plan Living Room\n`;
-    if (formData.hasKitchen) prompt += `- Kitchen\n`;
-    if (formData.hasDining) prompt += `- Dining Area\n`;
-    if (formData.hasStudy) prompt += `- Study / Home Office\n`;
-    
-    prompt += `\nOutdoor & Amenities (CRITICAL):\n`;
-    if (formData.hasBalcony) prompt += `- Balcony/Terrace\n`;
-    if (formData.hasGarden) prompt += `- Garden (Green Space)\n`;
-    if (formData.hasParking) prompt += `- Private Parking\n`;
-    if (formData.hasStorage) prompt += `- Storage Room\n`;
-    
-    if (formData.customNotes) {
-      prompt += `\nAdditional Notes: ${formData.customNotes}`;
-    }
+    if (['Villa', 'Duplex', 'Cottage'].includes(formData.buildingType)) prompt += `Roof Style: ${formData.roofType}. `;
+    prompt += `Total Area: ${formData.area} ${formData.unit}. Ceiling Height: ${formData.ceilingHeight}m. `;
+    prompt += `\nRequired Spaces: Bedrooms: ${formData.bedrooms}, Bathrooms: ${formData.bathrooms}`;
+    if (formData.hasLivingRoom) prompt += `, Open Plan Living Room`;
+    if (formData.hasKitchen) prompt += `, Kitchen`;
+    if (formData.hasDining) prompt += `, Dining Area`;
+    if (formData.hasGarden) prompt += `, Garden (Green Space)`;
+    if (formData.hasParking) prompt += `, Private Parking`;
+    if (formData.hasBalcony) prompt += `, Balcony/Terrace`;
+    if (formData.customNotes) prompt += `\nNotes: ${formData.customNotes}`;
 
     setMode('chat');
-    const userMsg: Message = { role: 'user', content: `[Detailed Config] ${prompt}`, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg, { role: 'assistant', content: 'Processing detailed configuration...', timestamp: Date.now() + 1 }]);
-    
+    setMessages(prev => [...prev, { role: 'user', content: `[Specification Submitted]\n${prompt}`, timestamp: Date.now() }, { role: 'assistant', content: 'Analyzing specs and generating blueprint...', timestamp: Date.now() + 1 }]);
     onGenerate(prompt);
   };
 
-  // ... Upload Handlers (Keep existing) ...
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setUploadFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setUploadFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setUploadFiles(prev => prev.filter((_, i) => i !== index));
+    if (e.target.files) setUploadFiles(prev => [...prev, ...Array.from(e.target.files)]);
   };
 
   const handleUploadSubmit = () => {
     if (uploadFiles.length === 0 || isGenerating) return;
     setMode('chat');
-    const userMsg: Message = { role: 'user', content: `Uploaded ${uploadFiles.length} file(s) for conversion.`, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg, { role: 'assistant', content: 'Scanning documents and converting to editable blueprints...', timestamp: Date.now() + 1 }]);
-    uploadFiles.forEach(file => {
-      onGenerateFromImage(file);
-    });
+    setMessages(prev => [...prev, { role: 'user', content: `Uploaded ${uploadFiles.length} file(s) for analysis.`, timestamp: Date.now() }, { role: 'assistant', content: 'Processing files...', timestamp: Date.now() + 1 }]);
+    uploadFiles.forEach(file => onGenerateFromImage(file));
     setUploadFiles([]);
   };
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200 w-full md:w-[400px] shadow-2xl z-10 font-sans">
-      {/* Brand Header */}
-      <div className="bg-slate-900 text-white p-5">
-         <h2 className="font-bold text-xl tracking-tight flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/50">
-               <Bot className="w-5 h-5 text-white" />
-            </div>
-            ArcHorizon
-         </h2>
-         <p className="text-slate-400 text-xs mt-1 ml-10">Professional Layout Generator</p>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="flex bg-slate-50 border-b border-gray-200 p-1">
-         <button onClick={() => setMode('chat')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-all ${mode === 'chat' ? 'bg-white text-slate-900 shadow-sm border border-gray-200' : 'text-slate-500 hover:text-slate-700'}`}>
-           <MessageSquare size={14} /> Chat
-         </button>
-         <button onClick={() => setMode('form')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-all ${mode === 'form' ? 'bg-white text-slate-900 shadow-sm border border-gray-200' : 'text-slate-500 hover:text-slate-700'}`}>
-           <ClipboardList size={14} /> Spec
-         </button>
-         <button onClick={() => setMode('upload')} className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-all ${mode === 'upload' ? 'bg-white text-slate-900 shadow-sm border border-gray-200' : 'text-slate-500 hover:text-slate-700'}`}>
-           <UploadCloud size={14} /> Files
-         </button>
+    <div className="flex flex-col h-full bg-white z-10">
+      
+      {/* Navigation Tabs - Modern Style */}
+      <div className="flex p-2 gap-1 bg-white border-b border-gray-200">
+         {[
+           { id: 'chat', icon: MessageSquare, label: 'Chat' },
+           { id: 'form', icon: ClipboardList, label: 'Spec Sheet' },
+           { id: 'upload', icon: UploadCloud, label: 'Import' }
+         ].map((tab) => (
+            <button 
+              key={tab.id}
+              onClick={() => setMode(tab.id as InputMode)} 
+              className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-2 ${
+                  mode === tab.id 
+                  ? 'bg-black text-white shadow-md' 
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+               <tab.icon size={14} /> {tab.label}
+            </button>
+         ))}
       </div>
 
       {/* CHAT MODE */}
       {mode === 'chat' && (
         <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 scrollbar-thin scrollbar-thumb-gray-200">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30">
             {messages.map((msg, idx) => (
-              <div key={idx} className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border ${msg.role === 'assistant' ? 'bg-white border-gray-200 text-blue-600' : 'bg-slate-800 border-slate-700 text-white'}`}>
-                  {msg.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
-                </div>
-                <div className={`p-3 rounded-2xl text-sm max-w-[85%] shadow-sm leading-relaxed ${msg.role === 'user' ? 'bg-slate-800 text-white rounded-tr-sm' : 'bg-white text-gray-700 border border-gray-100 rounded-tl-sm'}`}>
-                  {msg.content}
+              <div key={idx} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`flex gap-2 max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                   <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'user' ? 'bg-gray-200' : 'bg-black text-white'}`}>
+                      {msg.role === 'assistant' ? <Bot size={14} /> : <User size={14} />}
+                   </div>
+                   <div className={`p-3 rounded-xl text-sm shadow-sm leading-relaxed ${
+                       msg.role === 'user' 
+                       ? 'bg-white text-gray-800 border border-gray-200 rounded-tr-none' 
+                       : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none'
+                   }`}>
+                      {msg.content}
+                   </div>
                 </div>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
           <form onSubmit={handleChatSubmit} className="p-4 bg-white border-t border-gray-200">
-            <div className="relative group">
+            <div className="relative">
               <textarea
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSubmit(e); } }}
-                placeholder="Describe your architectural vision..."
+                placeholder="Describe your building ideas..."
                 disabled={isGenerating}
-                className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none h-[52px] group-focus-within:h-24 overflow-hidden"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all resize-none h-24"
               />
-              <button type="submit" disabled={!chatInput.trim() || isGenerating} className="absolute right-2 bottom-2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-600/20">
-                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              <button type="submit" disabled={!chatInput.trim() || isGenerating} className="absolute right-3 bottom-3 p-2 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-50 transition-colors shadow-sm">
+                {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-[10px] text-center text-gray-400 mt-2">Press Enter to send, Shift+Enter for new line</p>
           </form>
         </>
       )}
 
       {/* FORM MODE */}
       {mode === 'form' && (
-        <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-           <div className="flex-1 overflow-y-auto">
-             <form id="spec-form" onSubmit={handleFormSubmit} className="p-4 space-y-3">
+        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+             <form id="spec-form" onSubmit={handleFormSubmit} className="space-y-3">
                 
-                {/* Section 1: Specs */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                   <button type="button" onClick={() => toggleSection('specs')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Ruler size={16} className="text-blue-500"/> Project Specs</div>
-                      {sections.specs ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                   </button>
+                {/* Specs */}
+                <div className={THEME.card}>
+                   <div onClick={() => toggleSection('specs')} className={THEME.sectionHeader}>
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Ruler size={14}/> Project Specs</div>
+                      {sections.specs ? <ChevronUp size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
+                   </div>
                    {sections.specs && (
-                     <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2">
-                               <label className="text-xs font-medium text-gray-500 mb-1 block">Project Type</label>
-                               <select className="w-full text-sm p-2 border rounded-md" value={formData.buildingType} onChange={e => setFormData({...formData, buildingType: e.target.value})}>
-                                  <option>Apartment</option>
-                                  <option>Villa</option>
-                                  <option>Duplex</option>
-                                  <option>Cottage</option>
-                                  <option>Office</option>
+                     <div className="p-3 space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                               <label className={THEME.label}>Building Type</label>
+                               <select className={THEME.select} value={formData.buildingType} onChange={e => setFormData({...formData, buildingType: e.target.value})}>
+                                  {['Apartment', 'Villa', 'Duplex', 'Cottage', 'Office'].map(o => <option key={o}>{o}</option>)}
                                </select>
                             </div>
-                            
-                            {/* ROOF TYPE (Visible for houses) */}
-                            {['Villa', 'Duplex', 'Cottage'].includes(formData.buildingType) && (
-                                <div className="col-span-2">
-                                   <label className="text-xs font-medium text-gray-500 mb-1 block">Roof Style</label>
-                                   <select className="w-full text-sm p-2 border rounded-md" value={formData.roofType} onChange={e => setFormData({...formData, roofType: e.target.value as any})}>
-                                      <option>Modern Flat</option>
-                                      <option>Tiled/Pitched</option>
-                                   </select>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                   <label className={THEME.label}>Area (m²)</label>
+                                   <input type="number" className={THEME.input} value={formData.area} onChange={e => setFormData({...formData, area: Number(e.target.value)})}/>
                                 </div>
-                            )}
-
-                            <div>
-                               <label className="text-xs font-medium text-gray-500 mb-1 block">Total Area</label>
-                               <input type="number" className="w-full text-sm p-2 border rounded-md" value={formData.area} onChange={e => setFormData({...formData, area: Number(e.target.value)})}/>
-                            </div>
-                            <div>
-                               <label className="text-xs font-medium text-gray-500 mb-1 block">Floors</label>
-                               <div className="flex items-center border rounded-md overflow-hidden">
-                                  <button type="button" className="px-3 py-2 hover:bg-gray-100 border-r" onClick={() => setFormData(p => ({...p, floors: Math.max(1, p.floors - 1)}))}>-</button>
-                                  <div className="flex-1 text-center text-sm font-medium">{formData.floors}</div>
-                                  <button type="button" className="px-3 py-2 hover:bg-gray-100 border-l" onClick={() => setFormData(p => ({...p, floors: Math.min(5, p.floors + 1)}))}>+</button>
-                               </div>
+                                <div>
+                                   <label className={THEME.label}>Floors</label>
+                                   <input type="number" min="1" max="5" className={THEME.input} value={formData.floors} onChange={e => setFormData({...formData, floors: Number(e.target.value)})}/>
+                                </div>
                             </div>
                         </div>
                      </div>
                    )}
                 </div>
 
-                {/* Section 2: Rooms */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                   <button type="button" onClick={() => toggleSection('rooms')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Home size={16} className="text-blue-500"/> Spaces & Rooms</div>
-                      {sections.rooms ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                   </button>
+                {/* Rooms */}
+                <div className={THEME.card}>
+                   <div onClick={() => toggleSection('rooms')} className={THEME.sectionHeader}>
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Home size={14}/> Interior Program</div>
+                      {sections.rooms ? <ChevronUp size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
+                   </div>
                    {sections.rooms && (
-                     <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                        <div className="flex justify-between items-center">
-                           <label className="text-sm text-gray-600">Bedrooms</label>
-                           <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} />
+                     <div className="p-3 space-y-4">
+                        <div className="flex gap-4">
+                           <div className="flex-1">
+                              <label className={THEME.label}>Bedrooms</label>
+                              <input type="number" className={THEME.input} value={formData.bedrooms} onChange={e => setFormData({...formData, bedrooms: Number(e.target.value)})} />
+                           </div>
+                           <div className="flex-1">
+                              <label className={THEME.label}>Bathrooms</label>
+                              <input type="number" className={THEME.input} value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} />
+                           </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                           <label className="text-sm text-gray-600">Bathrooms</label>
-                           <input type="number" className="w-16 text-sm p-1 border rounded text-center" value={formData.bathrooms} onChange={e => setFormData({...formData, bathrooms: Number(e.target.value)})} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 pt-2">
-                           {['hasLivingRoom', 'hasKitchen', 'hasDining', 'hasStudy'].map((key) => (
-                             <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                                <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
-                                {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
-                             </label>
-                           ))}
-                        </div>
-                     </div>
-                   )}
-                </div>
-
-                {/* Section 3: Outdoor */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                   <button type="button" onClick={() => toggleSection('outdoor')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Trees size={16} className="text-blue-500"/> Outdoor & Amenities</div>
-                      {sections.outdoor ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                   </button>
-                   {sections.outdoor && (
-                     <div className="p-4 space-y-2 animate-in slide-in-from-top-2 duration-200">
                         <div className="grid grid-cols-2 gap-2">
-                           {['hasBalcony', 'hasGarden', 'hasParking', 'hasStorage'].map((key) => (
-                             <label key={key} className={`flex items-center gap-2 p-2 rounded border text-xs font-medium cursor-pointer transition-all ${formData[key as keyof typeof formData] ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
-                                <input type="checkbox" className="hidden" checked={formData[key as keyof typeof formData] as boolean} onChange={e => setFormData({...formData, [key]: e.target.checked})} />
-                                {key.replace('has', '').replace(/([A-Z])/g, ' $1').trim()}
-                             </label>
+                           {['hasLivingRoom', 'hasKitchen', 'hasDining', 'hasStudy'].map((key) => (
+                             <div 
+                                key={key} 
+                                onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key as keyof typeof formData] }))}
+                                className={`flex items-center gap-2 p-2 border rounded-md text-xs font-medium cursor-pointer transition-all select-none ${formData[key as keyof typeof formData] ? 'border-black bg-gray-50 text-black' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                             >
+                                <div className={`w-3 h-3 rounded-sm border ${formData[key as keyof typeof formData] ? 'bg-black border-black' : 'bg-white border-gray-300'}`}></div>
+                                {key.replace('has', '')}
+                             </div>
                            ))}
                         </div>
                      </div>
                    )}
                 </div>
 
-                {/* Section 4: Style */}
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                   <button type="button" onClick={() => toggleSection('style')} className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><Sparkles size={16} className="text-blue-500"/> Style & Notes</div>
-                      {sections.style ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                   </button>
+                {/* Outdoor */}
+                <div className={THEME.card}>
+                   <div onClick={() => toggleSection('outdoor')} className={THEME.sectionHeader}>
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Trees size={14}/> Exterior Features</div>
+                      {sections.outdoor ? <ChevronUp size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
+                   </div>
+                   {sections.outdoor && (
+                     <div className="p-3">
+                        <div className="grid grid-cols-2 gap-2">
+                           {['hasBalcony', 'hasGarden', 'hasParking'].map((key) => (
+                             <div 
+                                key={key} 
+                                onClick={() => setFormData(prev => ({ ...prev, [key]: !prev[key as keyof typeof formData] }))}
+                                className={`flex items-center gap-2 p-2 border rounded-md text-xs font-medium cursor-pointer transition-all select-none ${formData[key as keyof typeof formData] ? 'border-black bg-gray-50 text-black' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                             >
+                                <div className={`w-3 h-3 rounded-sm border ${formData[key as keyof typeof formData] ? 'bg-black border-black' : 'bg-white border-gray-300'}`}></div>
+                                {key.replace('has', '')}
+                             </div>
+                           ))}
+                        </div>
+                     </div>
+                   )}
+                </div>
+
+                {/* Style */}
+                <div className={THEME.card}>
+                   <div onClick={() => toggleSection('style')} className={THEME.sectionHeader}>
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Sparkles size={14}/> Design Aesthetic</div>
+                      {sections.style ? <ChevronUp size={14} className="text-gray-400"/> : <ChevronDown size={14} className="text-gray-400"/>}
+                   </div>
                    {sections.style && (
-                     <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                     <div className="p-3 space-y-3">
                         <div>
-                           <label className="text-xs font-medium text-gray-500 mb-1 block">Design Aesthetic</label>
-                           <div className="flex bg-gray-100 p-1 rounded-lg">
+                           <label className={THEME.label}>Style Preference</label>
+                           <div className="flex gap-2">
                               {['Modern', 'Rustic', 'Creative'].map(s => (
-                                 <button key={s} type="button" onClick={() => setFormData({...formData, designStyle: s as any})} className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${formData.designStyle === s ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-500'}`}>
+                                 <button key={s} type="button" onClick={() => setFormData({...formData, designStyle: s as any})} className={`flex-1 py-2 text-xs font-semibold rounded-md border transition-all ${formData.designStyle === s ? 'border-black bg-black text-white shadow-md' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
                                     {s}
                                  </button>
                               ))}
                            </div>
                         </div>
                         <div>
-                           <label className="text-xs font-medium text-gray-500 mb-1 block">Custom Requirements</label>
-                           <textarea 
-                              className="w-full text-sm p-2 border rounded-md h-20 resize-none focus:ring-1 focus:ring-blue-500 outline-none" 
-                              placeholder="E.g. I want a kitchen island and a walk-in closet..."
-                              value={formData.customNotes}
-                              onChange={e => setFormData({...formData, customNotes: e.target.value})}
-                           />
+                           <label className={THEME.label}>Additional Notes</label>
+                           <textarea className={THEME.input} rows={3} value={formData.customNotes} onChange={e => setFormData({...formData, customNotes: e.target.value})} placeholder="e.g., large south-facing windows..."/>
                         </div>
                      </div>
                    )}
                 </div>
              </form>
            </div>
-
-           {/* Submit Button - Fixed at bottom */}
-           <div className="p-4 bg-white border-t border-gray-200 shrink-0">
-              <button type="submit" form="spec-form" disabled={isGenerating} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                 {isGenerating ? <Loader2 className="animate-spin" /> : <Send size={18} />}
+           <div className="p-4 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+              <button type="submit" form="spec-form" disabled={isGenerating} className={THEME.buttonPrimary + " w-full py-3 flex items-center justify-center gap-2 text-sm"}>
+                 {isGenerating ? <Loader2 className="animate-spin" /> : <Send size={16} />}
                  Generate Blueprint
               </button>
            </div>
@@ -382,33 +284,45 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
 
       {/* UPLOAD MODE */}
       {mode === 'upload' && (
-         <div className="flex-1 p-4 bg-slate-50 flex flex-col gap-4">
-            <div className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer bg-white ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-300'}`} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>
+         <div className="flex-1 p-6 bg-white flex flex-col gap-4">
+            <div 
+               className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer h-64 ${isDragging ? 'border-black bg-blue-50' : 'border-gray-300 hover:border-black hover:bg-gray-50'}`} 
+               onDragOver={(e) => {e.preventDefault(); setIsDragging(true)}} 
+               onDragLeave={() => setIsDragging(false)} 
+               onDrop={(e) => {e.preventDefault(); setIsDragging(false); if(e.dataTransfer.files) setUploadFiles(p => [...p, ...Array.from(e.dataTransfer.files)])}} 
+               onClick={() => fileInputRef.current?.click()}
+            >
                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple accept="image/*,application/pdf,.dxf" />
-               <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
-                 <UploadCloud className="text-blue-500 w-6 h-6" />
+               <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-600">
+                  <UploadCloud size={24} />
                </div>
-               <p className="text-sm font-bold text-gray-700">Click or Drag files here</p>
-               <p className="text-xs text-gray-400 mt-1">Supports PDF, DXF, JPG, PNG</p>
+               <p className="text-sm font-bold text-gray-900">Click or drag files to upload</p>
+               <p className="text-xs text-gray-500 mt-1">Supports DXF, PDF, JPG, PNG</p>
             </div>
-            <div className="flex-1 overflow-y-auto space-y-2">
-               {uploadFiles.map((file, idx) => (
-                  <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center shrink-0">
-                         {file.name.toLowerCase().endsWith('.dxf') ? <FileCode size={20} className="text-green-600"/> : file.type.includes('pdf') ? <FileText size={20} className="text-red-500"/> : <ImageIcon size={20} className="text-purple-500"/>}
+            
+            {uploadFiles.length > 0 && (
+                <div className="flex-1 overflow-y-auto space-y-2 border-t border-gray-100 pt-4">
+                   <label className={THEME.label}>Ready to Process</label>
+                   {uploadFiles.map((file, idx) => (
+                      <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex items-center gap-3">
+                          <div className="w-8 h-8 bg-white rounded flex items-center justify-center border border-gray-200 text-blue-600">
+                            {file.name.endsWith('.dxf') ? <FileCode size={16}/> : <ImageIcon size={16}/>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                             <p className="text-xs font-bold truncate text-gray-800">{file.name}</p>
+                             <p className="text-[10px] text-gray-400">{(file.size / 1024).toFixed(0)} KB</p>
+                          </div>
+                          <button onClick={() => setUploadFiles(p => p.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 transition-colors"><X size={16}/></button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                         <p className="text-sm font-medium truncate">{file.name}</p>
-                         <p className="text-[10px] text-gray-400 uppercase">{(file.size / 1024).toFixed(1)} KB</p>
-                      </div>
-                      <button onClick={() => removeFile(idx)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><X size={16} /></button>
-                  </div>
-               ))}
+                   ))}
+                </div>
+            )}
+            
+            <div className="mt-auto">
+                <button onClick={handleUploadSubmit} disabled={uploadFiles.length === 0 || isGenerating} className={THEME.buttonPrimary + " w-full py-3"}>
+                     Convert to Blueprint
+                </button>
             </div>
-            <button onClick={handleUploadSubmit} disabled={uploadFiles.length === 0 || isGenerating} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                 {isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
-                 Digitize & Convert
-            </button>
          </div>
       )}
     </div>

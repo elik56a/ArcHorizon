@@ -15,9 +15,29 @@ declare global {
       planeGeometry: any;
       meshStandardMaterial: any;
       meshPhysicalMaterial: any;
+      meshBasicMaterial: any;
       ambientLight: any;
       directionalLight: any;
       orthographicCamera: any;
+      [elemName: string]: any;
+    }
+  }
+  // Augment React.JSX for newer TS/React versions
+  namespace React {
+    namespace JSX {
+      interface IntrinsicElements {
+        group: any;
+        mesh: any;
+        boxGeometry: any;
+        planeGeometry: any;
+        meshStandardMaterial: any;
+        meshPhysicalMaterial: any;
+        meshBasicMaterial: any;
+        ambientLight: any;
+        directionalLight: any;
+        orthographicCamera: any;
+        [elemName: string]: any;
+      }
     }
   }
 }
@@ -453,7 +473,7 @@ const DragManager: React.FC<{
             rotation={[-Math.PI / 2, 0, 0]} 
             position={[0, 0, 0]} 
             visible={!!dragState.id} 
-            onPointerMove={handlePointerMove}
+            onPointerMove={handlePointerMove} 
             onPointerUp={handlePointerUp}
             onPointerDown={(e) => e.stopPropagation()}
         >
