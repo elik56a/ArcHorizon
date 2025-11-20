@@ -1,18 +1,14 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
 import { THEME } from '../theme';
-import { Send, Loader2, MessageSquare, ClipboardList, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileText, X, Image as ImageIcon, FileCode, Bot, User, ArrowRight } from 'lucide-react';
-
-interface InputPanelProps {
-  onGenerate: (prompt: string) => void;
-  onGenerateFromImage: (file: File) => void;
-  isGenerating: boolean;
-}
+import { useProjectStore } from '../store/useProjectStore'; 
+import { Send, Loader2, MessageSquare, ClipboardList, ChevronDown, ChevronUp, Ruler, Home, Trees, Sparkles, UploadCloud, FileCode, Image as ImageIcon, X, Bot, User, ArrowRight } from 'lucide-react';
 
 type InputMode = 'chat' | 'form' | 'upload';
 
-const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage, isGenerating }) => {
+const ChatSidebar: React.FC = () => {
+  const { isGenerating, generateByPrompt, generateByFile } = useProjectStore();
+  
   const [mode, setMode] = useState<InputMode>('chat');
   
   // Chat State
@@ -51,7 +47,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
     if (!chatInput.trim() || isGenerating) return;
     const userMsg: Message = { role: 'user', content: chatInput, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
-    onGenerate(chatInput);
+    generateByPrompt(chatInput);
     setChatInput('');
     setMessages(prev => [...prev, { role: 'assistant', content: 'Designing...', timestamp: Date.now() + 1 }]);
   };
@@ -73,7 +69,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
 
     setMode('chat');
     setMessages(prev => [...prev, { role: 'user', content: `[Specification Submitted]\n${prompt}`, timestamp: Date.now() }, { role: 'assistant', content: 'Analyzing specs and generating blueprint...', timestamp: Date.now() + 1 }]);
-    onGenerate(prompt);
+    generateByPrompt(prompt);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,14 +80,14 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
     if (uploadFiles.length === 0 || isGenerating) return;
     setMode('chat');
     setMessages(prev => [...prev, { role: 'user', content: `Uploaded ${uploadFiles.length} file(s) for analysis.`, timestamp: Date.now() }, { role: 'assistant', content: 'Processing files...', timestamp: Date.now() + 1 }]);
-    uploadFiles.forEach(file => onGenerateFromImage(file));
+    uploadFiles.forEach(file => generateByFile(file));
     setUploadFiles([]);
   };
 
   return (
     <div className="flex flex-col h-full bg-white z-10">
       
-      {/* Navigation Tabs - Modern Style */}
+      {/* Navigation Tabs */}
       <div className="flex p-2 gap-1 bg-white border-b border-gray-200">
          {[
            { id: 'chat', icon: MessageSquare, label: 'Chat' },
@@ -157,8 +153,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
         <div className="flex-1 flex flex-col bg-white overflow-hidden">
            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
              <form id="spec-form" onSubmit={handleFormSubmit} className="space-y-3">
-                
-                {/* Specs */}
+                {/* Form content */}
                 <div className={THEME.card}>
                    <div onClick={() => toggleSection('specs')} className={THEME.sectionHeader}>
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Ruler size={14}/> Project Specs</div>
@@ -188,7 +183,6 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
                    )}
                 </div>
 
-                {/* Rooms */}
                 <div className={THEME.card}>
                    <div onClick={() => toggleSection('rooms')} className={THEME.sectionHeader}>
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Home size={14}/> Interior Program</div>
@@ -222,7 +216,6 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
                    )}
                 </div>
 
-                {/* Outdoor */}
                 <div className={THEME.card}>
                    <div onClick={() => toggleSection('outdoor')} className={THEME.sectionHeader}>
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Trees size={14}/> Exterior Features</div>
@@ -246,7 +239,6 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
                    )}
                 </div>
 
-                {/* Style */}
                 <div className={THEME.card}>
                    <div onClick={() => toggleSection('style')} className={THEME.sectionHeader}>
                       <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><Sparkles size={14}/> Design Aesthetic</div>
@@ -274,7 +266,7 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
              </form>
            </div>
            <div className="p-4 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
-              <button type="submit" form="spec-form" disabled={isGenerating} className={THEME.buttonPrimary + " w-full py-3 flex items-center justify-center gap-2 text-sm"}>
+              <button type="submit" form="spec-form" disabled={isGenerating} className={`${THEME.buttonPrimary} w-full py-3 flex items-center justify-center gap-2 text-sm relative`}>
                  {isGenerating ? <Loader2 className="animate-spin" /> : <Send size={16} />}
                  Generate Blueprint
               </button>
@@ -329,4 +321,4 @@ const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, onGenerateFromImage
   );
 };
 
-export default InputPanel;
+export default ChatSidebar;

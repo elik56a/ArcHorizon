@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { SketchData, ElementType, RoomType } from '../types';
+import { useProjectStore } from '../store/useProjectStore';
 import { THEME } from '../theme';
 import { 
   Settings2, Trash2, Box, LayoutGrid,
@@ -9,16 +9,10 @@ import {
   Waves, Flame, Move, Trees
 } from 'lucide-react';
 
-interface RightSidePanelProps {
-  selection: { id: string; type: 'room' | 'element' } | null;
-  data: SketchData | null;
-  onUpdateItem: (id: string, type: 'room' | 'element', field: string, value: any) => void;
-  onDeleteItem: (id: string, type: 'room' | 'element') => void;
-  onAddItem: (type: ElementType | RoomType, category: 'room' | 'element') => void;
-}
+const RightSidePanel: React.FC = () => {
+  const { selection, getCurrentSketch, updateItem, deleteItem, addItem } = useProjectStore();
+  const data = getCurrentSketch();
 
-const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpdateItem, onDeleteItem, onAddItem }) => {
-  
   // --- ITEM PROPERTIES MODE ---
   if (selection && data) {
     const item = selection.type === 'room' ? data.rooms.find(r => r.id === selection.id) : data.elements.find(e => e.id === selection.id);
@@ -40,7 +34,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpda
            <div>
               <label className={THEME.label}>Identity</label>
               {selection.type === 'room' && (
-                 <input type="text" value={(item as any).name || ''} onChange={(e) => onUpdateItem(item.id, selection.type, 'name', e.target.value)} className={THEME.input} placeholder="Room Name" />
+                 <input type="text" value={(item as any).name || ''} onChange={(e) => updateItem(item.id, selection.type, 'name', e.target.value)} className={THEME.input} placeholder="Room Name" />
               )}
               {selection.type === 'element' && (
                   <div className="text-sm text-gray-500 italic py-2">Element ID: {item.id}</div>
@@ -52,19 +46,19 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpda
               <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">W</span>
-                      <input type="number" value={item.width} onChange={(e) => onUpdateItem(item.id, selection.type, 'width', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input type="number" value={item.width} onChange={(e) => updateItem(item.id, selection.type, 'width', Number(e.target.value))} className={`${THEME.input} pl-6`} />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">H</span>
-                      <input type="number" value={item.height} onChange={(e) => onUpdateItem(item.id, selection.type, 'height', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input type="number" value={item.height} onChange={(e) => updateItem(item.id, selection.type, 'height', Number(e.target.value))} className={`${THEME.input} pl-6`} />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">X</span>
-                      <input type="number" value={item.x} onChange={(e) => onUpdateItem(item.id, selection.type, 'x', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input type="number" value={item.x} onChange={(e) => updateItem(item.id, selection.type, 'x', Number(e.target.value))} className={`${THEME.input} pl-6`} />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">Y</span>
-                      <input type="number" value={item.y} onChange={(e) => onUpdateItem(item.id, selection.type, 'y', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input type="number" value={item.y} onChange={(e) => updateItem(item.id, selection.type, 'y', Number(e.target.value))} className={`${THEME.input} pl-6`} />
                   </div>
               </div>
            </div>
@@ -76,7 +70,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpda
                    {[0, 90, 180, 270].map(deg => (
                       <button 
                         key={deg} 
-                        onClick={() => onUpdateItem(item.id, selection.type, 'rotation', deg)} 
+                        onClick={() => updateItem(item.id, selection.type, 'rotation', deg)} 
                         className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${// @ts-ignore
                         (item.rotation || 0) === deg ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                       >
@@ -90,7 +84,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpda
 
         <div className="p-5 border-t border-gray-200 bg-gray-50">
            <button 
-            onClick={() => onDeleteItem(item.id, selection.type)} 
+            onClick={() => deleteItem(item.id, selection.type)} 
             className="w-full py-2.5 bg-white border border-red-200 text-red-600 font-semibold text-sm hover:bg-red-50 hover:border-red-300 transition-all rounded-md flex items-center justify-center gap-2 shadow-sm"
            >
               <Trash2 size={16} /> Delete {selection.type === 'room' ? 'Room' : 'Object'}
@@ -149,7 +143,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({ selection, data, onUpda
                    {types.map((t) => (
                       <button 
                         key={t}
-                        onClick={() => onAddItem(t as any, t === 'bedroom' || t === 'garden' ? 'room' : 'element')}
+                        onClick={() => addItem(t as any, t === 'bedroom' || t === 'garden' ? 'room' : 'element')}
                         className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md transition-all group bg-white aspect-square"
                         title={`Add ${t.replace('_', ' ')}`}
                       >

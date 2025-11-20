@@ -1,37 +1,25 @@
+
 import React, { useState, useRef, useEffect } from 'react';
+import { useProjectStore } from '../../store/useProjectStore'; // Store Import
+import { useUiStore } from '../../store/useUiStore'; // Store Import
 import { SketchData, Room, ArchitecturalElement } from '../../types';
 import { downloadDXF, downloadPDF, downloadSVG } from '../../services/exportService';
-import { Compass, Box, Layers, LayoutTemplate, ArrowUpCircle } from 'lucide-react';
+import { Compass } from 'lucide-react';
 import Canvas3D from './Canvas3D';
 import Canvas2D from './Canvas2D';
 import { ViewportHeader, ViewportToolbar, FloorSelector } from './BlueprintControls';
 
-interface BlueprintCanvasProps {
-  data: SketchData | null;
-  isLoading: boolean;
-  onUpdate: (newData: SketchData) => void;
-  historyControl?: { undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean; }
-  selectedId?: string;
-  onSelect?: (id: string | null, type?: 'room' | 'element') => void;
-}
-
-interface DragState { id: string; type: 'room' | 'element'; startX: number; startY: number; initialX: number; initialY: number; }
-interface ResizeState { id: string; type: 'room' | 'element'; handle: string; startMouseX: number; startMouseY: number; initialMsg: { x: number, y: number, width: number, height: number, rotation: number }; }
-
+// Loading Overlay remains internal to this component as it's visual only
 const LoadingOverlay: React.FC = () => {
     const [step, setStep] = useState(0);
     const STEPS = ["INITIALIZING KERNEL...", "RESOLVING SPATIAL CONSTRAINTS...", "GENERATING VECTOR GEOMETRY...", "OPTIMIZING LAYOUT TOPOLOGY..."];
-
     useEffect(() => {
         const interval = setInterval(() => setStep(p => (p + 1) % STEPS.length), 2500);
         return () => clearInterval(interval);
     }, []);
-
     return (
         <div className="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center select-none">
-            {/* Technical Grid Background */}
             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
-            
             <div className="relative z-10 bg-white p-8 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center max-w-md w-full">
                 <div className="w-16 h-16 border-4 border-t-black border-gray-200 rounded-full animate-spin mb-6"></div>
                 <h3 className="text-xl font-black font-mono uppercase tracking-tighter mb-2">PROCESSING BLUEPRINT</h3>
@@ -44,21 +32,36 @@ const LoadingOverlay: React.FC = () => {
     );
 };
 
-const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUpdate, historyControl, selectedId, onSelect }) => {
+interface DragState { id: string; type: 'room' | 'element'; startX: number; startY: number; initialX: number; initialY: number; }
+interface ResizeState { id: string; type: 'room' | 'element'; handle: string; startMouseX: number; startMouseY: number; initialMsg: { x: number, y: number, width: number, height: number, rotation: number }; }
+
+const BlueprintCanvas: React.FC = () => {
+  // STORE HOOKS
+  const { 
+      getCurrentSketch, isGenerating, setSelection, selection, 
+      updateOptionStatus, currentOptionIndex, sketchOptions,
+      undo, redo, history, future 
+  } = useProjectStore();
+
+  const { setPanel } = useUiStore();
+
+  const data = getCurrentSketch();
+  const isLoading = isGenerating && !data;
+
+  // Local View State
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
-  const [localData, setLocalData] = useState<SketchData | null>(data);
   const [activeFloor, setActiveFloor] = useState<number>(1);
   const [showAllFloors, setShowAllFloors] = useState(false);
-  
   const [scale, setScale] = useState(0.6);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState({ x: 50, y: 50 });
   
   const cameraStateRef = useRef<{ position: any, target: any } | null>(null);
   
+  // Interaction State
+  const [localData, setLocalData] = useState<SketchData | null>(data); // Intermediate state during drag
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -70,8 +73,14 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
   const [isDraggingToolbar, setIsDraggingToolbar] = useState(false);
   const [toolbarDragOffset, setToolbarDragOffset] = useState({x: 0, y: 0});
 
-  useEffect(() => { if (!dragState && !resizeState) setLocalData(data); }, [data, dragState, resizeState]);
+  // Sync Store Data to Local Data (unless dragging)
+  useEffect(() => { 
+      if (!dragState && !resizeState) {
+          setLocalData(data); 
+      }
+  }, [data, dragState, resizeState]);
 
+  // Fit Screen Logic
   useEffect(() => {
     if (data?.rooms.length) {
         const minFloor = Math.min(...data.rooms.map(r => r.floor));
@@ -160,19 +169,28 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
     mouseDownPos.current = { x: e.clientX, y: e.clientY };
     const modelPos = getModelCoordinates(e.clientX, e.clientY);
 
+    // RESIZE START
     if (resizeHandle && id && type && localData) {
         const item = type === 'room' ? localData.rooms.find(r => r.id === id) : localData.elements.find(el => el.id === id);
         if (item) setResizeState({ id, type, handle: resizeHandle, startMouseX: modelPos.x, startMouseY: modelPos.y, initialMsg: { x: item.x, y: item.y, width: item.width, height: item.height, rotation: (item as any).rotation || 0 } });
         return;
     } 
+    // DRAG START
     if (id && type && x !== undefined && y !== undefined) {
-        if (id === selectedId) setDragState({ id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y });
-        else { setIsPanning(true); setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y }); setPotentialSelection({ id, type }); }
+        // Only drag if already selected, otherwise default to pan (select on mouse up)
+        if (id === selection?.id) {
+            setDragState({ id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y });
+        } else { 
+            setIsPanning(true); 
+            setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y }); 
+            setPotentialSelection({ id, type }); 
+        }
         return;
     } 
+    // PAN START
     setIsPanning(true);
     setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    if (onSelect) onSelect(null);
+    setSelection(null); // Deselect when clicking empty space
   };
 
   const handleToolbarDragStart = (e: React.MouseEvent) => {
@@ -195,14 +213,17 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (viewMode === '3d' || isDraggingToolbar) return;
+    
     if (mouseDownPos.current) {
         if (Math.abs(e.clientX - mouseDownPos.current.x) > 6 || Math.abs(e.clientY - mouseDownPos.current.y) > 6) setHasMoved(true);
     }
+    // Ignore small movements
     if (!hasMoved && (!mouseDownPos.current || (Math.abs(e.clientX - mouseDownPos.current.x) <= 6 && Math.abs(e.clientY - mouseDownPos.current.y) <= 6))) return;
     
     const modelPos = getModelCoordinates(e.clientX, e.clientY);
 
     if (resizeState && localData) {
+        // ... Resize Logic (Same as before, just updating local state)
         const { startMouseX, startMouseY, initialMsg, handle } = resizeState;
         const dx = modelPos.x - startMouseX;
         const dy = modelPos.y - startMouseY;
@@ -221,20 +242,40 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
         
         if (resizeState.type === 'room') setLocalData({ ...localData, rooms: localData.rooms.map(r => r.id === resizeState.id ? { ...r, x: newX, y: newY, width: newW, height: newH } : r) });
         else setLocalData({ ...localData, elements: localData.elements.map(el => el.id === resizeState.id ? { ...el, x: newX, y: newY, width: newW, height: newH } : el) });
+
     } else if (dragState && localData) {
+      // Drag Logic
       const dx = modelPos.x - dragState.startX;
       const dy = modelPos.y - dragState.startY;
       const snappedX = Math.round((dragState.initialX + dx) / 10) * 10; 
       const snappedY = Math.round((dragState.initialY + dy) / 10) * 10;
+      
       if (dragState.type === 'room') setLocalData({ ...localData, rooms: localData.rooms.map(r => r.id === dragState.id ? { ...r, x: snappedX, y: snappedY } : r) });
       else setLocalData({ ...localData, elements: localData.elements.map(el => el.id === dragState.id ? { ...el, x: snappedX, y: snappedY } : el) });
-    } else if (isPanning) setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    } else if (isPanning) {
+        setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
   };
 
   const handleMouseUp = () => {
-    if (potentialSelection && !hasMoved && onSelect) onSelect(potentialSelection.id, potentialSelection.type);
-    else if (hasMoved && (dragState || resizeState) && localData) { onUpdate(localData); if (dragState && onSelect) onSelect(dragState.id, dragState.type); }
+    if (potentialSelection && !hasMoved) {
+        // Simple Click: Select the item
+        setSelection(potentialSelection);
+        setPanel('right', true); // Open right panel on selection
+    }
+    else if (hasMoved && (dragState || resizeState) && localData) {
+        // Finished Drag/Resize: Commit to Store
+        updateOptionStatus(currentOptionIndex, { status: 'loaded', data: localData });
+        if (dragState) setSelection({ id: dragState.id, type: dragState.type });
+    }
+    
+    // Reset Interaction States
     setDragState(null); setResizeState(null); setIsPanning(false); setPotentialSelection(null); setHasMoved(false); mouseDownPos.current = null;
+  };
+
+  // Helper to commit changes from 3D view
+  const handle3DUpdate = (newData: SketchData) => {
+      updateOptionStatus(currentOptionIndex, { status: 'loaded', data: newData });
   };
 
   const handleDownload = (type: 'svg' | 'pdf' | 'dxf') => {
@@ -269,13 +310,53 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({ data, isLoading, onUp
 
   return (
     <div className={`flex-1 relative overflow-hidden bg-[#f0f0f0] h-full w-full ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`} ref={containerRef}>
+      
       <ViewportHeader data={localData} activeFloor={activeFloor} totalFloors={totalFloors} onDownload={handleDownload} />
-      <FloorSelector totalFloors={totalFloors} activeFloor={activeFloor} showAllFloors={showAllFloors} onChange={(f) => { setActiveFloor(f); setShowAllFloors(false); }} onToggleAll={() => setShowAllFloors(!showAllFloors)} viewMode={viewMode} />
-      <ViewportToolbar viewMode={viewMode} setViewMode={setViewMode} scale={scale} setScale={setScale} rotateCanvas={rotateCanvas} onFit={() => fitToScreen()} history={historyControl} position={toolbarPos} onDragStart={handleToolbarDragStart} />
+      
+      <FloorSelector 
+          totalFloors={totalFloors} 
+          activeFloor={activeFloor} 
+          showAllFloors={showAllFloors} 
+          onChange={(f) => { setActiveFloor(f); setShowAllFloors(false); }} 
+          onToggleAll={() => setShowAllFloors(!showAllFloors)} 
+          viewMode={viewMode} 
+      />
+      
+      <ViewportToolbar 
+          viewMode={viewMode} 
+          setViewMode={setViewMode} 
+          scale={scale} 
+          setScale={setScale} 
+          rotateCanvas={rotateCanvas} 
+          onFit={() => fitToScreen()} 
+          history={{ undo, redo, canUndo: history.length > 0, canRedo: future.length > 0 }} 
+          position={toolbarPos} 
+          onDragStart={handleToolbarDragStart} 
+      />
+
       {viewMode === '3d' ? (
-        <Canvas3D data={localData} activeFloor={activeFloor} showAllFloors={showAllFloors} onUpdate={onUpdate} cameraStateRef={cameraStateRef} />
+        <Canvas3D 
+            data={localData} 
+            activeFloor={activeFloor} 
+            showAllFloors={showAllFloors} 
+            onUpdate={handle3DUpdate} 
+            cameraStateRef={cameraStateRef} 
+        />
       ) : (
-        <Canvas2D svgRef={svgRef} data={localData} activeFloor={activeFloor} pan={pan} scale={scale} rotation={rotation} bounds={getBounds(localData.rooms.filter(r => r.floor === activeFloor))} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} selectedId={selectedId} />
+        <Canvas2D 
+            svgRef={svgRef} 
+            data={localData} 
+            activeFloor={activeFloor} 
+            pan={pan} 
+            scale={scale} 
+            rotation={rotation} 
+            bounds={getBounds(localData.rooms.filter(r => r.floor === activeFloor))} 
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove} 
+            onMouseUp={handleMouseUp} 
+            onWheel={handleWheel} 
+            selectedId={selection?.id} 
+        />
       )}
     </div>
   );
