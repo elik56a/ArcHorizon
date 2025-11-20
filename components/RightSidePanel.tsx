@@ -10,13 +10,19 @@ import {
 } from 'lucide-react';
 
 const RightSidePanel: React.FC = () => {
-  const { selection, getCurrentSketch, updateItem, deleteItem, addItem } = useProjectStore();
+  const { selection, getCurrentSketch, updateItem, deleteItem, addItem, unitSystem } = useProjectStore();
   const data = getCurrentSketch();
 
   // --- ITEM PROPERTIES MODE ---
   if (selection && data) {
     const item = selection.type === 'room' ? data.rooms.find(r => r.id === selection.id) : data.elements.find(e => e.id === selection.id);
     if (!item) return null;
+
+    const isImperial = unitSystem === 'imperial';
+
+    // Converters
+    const toDisplay = (val: number) => isImperial ? Number((val * 0.0328084).toFixed(2)) : val;
+    const fromInput = (val: number) => isImperial ? Math.round(val / 0.0328084) : val;
 
     return (
       <div className="h-full flex flex-col bg-white border-l border-gray-200">
@@ -84,23 +90,43 @@ const RightSidePanel: React.FC = () => {
            </div>
 
            <div>
-              <label className={THEME.label}>Dimensions & Position</label>
+              <label className={THEME.label}>Dimensions & Position <span className="text-gray-400 font-normal lowercase ml-1">({isImperial ? 'ft' : 'cm'})</span></label>
               <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">W</span>
-                      <input type="number" value={item.width} onChange={(e) => updateItem(item.id, selection.type, 'width', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input 
+                        type="number" 
+                        value={toDisplay(item.width)} 
+                        onChange={(e) => updateItem(item.id, selection.type, 'width', fromInput(Number(e.target.value)))} 
+                        className={`${THEME.input} pl-6`} 
+                      />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">H</span>
-                      <input type="number" value={item.height} onChange={(e) => updateItem(item.id, selection.type, 'height', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input 
+                        type="number" 
+                        value={toDisplay(item.height)} 
+                        onChange={(e) => updateItem(item.id, selection.type, 'height', fromInput(Number(e.target.value)))} 
+                        className={`${THEME.input} pl-6`} 
+                      />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">X</span>
-                      <input type="number" value={item.x} onChange={(e) => updateItem(item.id, selection.type, 'x', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input 
+                        type="number" 
+                        value={toDisplay(item.x)} 
+                        onChange={(e) => updateItem(item.id, selection.type, 'x', fromInput(Number(e.target.value)))} 
+                        className={`${THEME.input} pl-6`} 
+                      />
                   </div>
                   <div className="relative">
                       <span className="absolute left-2 top-2.5 text-xs text-gray-400 font-mono">Y</span>
-                      <input type="number" value={item.y} onChange={(e) => updateItem(item.id, selection.type, 'y', Number(e.target.value))} className={`${THEME.input} pl-6`} />
+                      <input 
+                        type="number" 
+                        value={toDisplay(item.y)} 
+                        onChange={(e) => updateItem(item.id, selection.type, 'y', fromInput(Number(e.target.value)))} 
+                        className={`${THEME.input} pl-6`} 
+                      />
                   </div>
               </div>
            </div>

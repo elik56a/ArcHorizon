@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, Layers, RotateCw, RotateCcw, LucideIcon, GripHorizontal, Building2 } from 'lucide-react';
 import { SketchData } from '../../types';
+import { useProjectStore } from '../../store/useProjectStore';
 
 // --- HELPER: TOOLTIP BUTTON ---
 interface TooltipButtonProps {
@@ -41,13 +42,21 @@ export const ViewportHeader: React.FC<{
     onDownload: (type: 'svg' | 'pdf' | 'dxf') => void;
 }> = ({ data, activeFloor, totalFloors, onDownload }) => {
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const { unitSystem } = useProjectStore();
+
+    const formatArea = (sqm: number) => {
+        if (unitSystem === 'imperial') {
+            return `${Math.round(sqm * 10.764).toLocaleString()} SQ FT`;
+        }
+        return `${sqm} M²`;
+    };
 
     return (
         <>
             <div className="absolute top-6 left-6 bg-white border-2 border-black px-4 py-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-20 flex flex-col pointer-events-none select-none">
                 <h1 className="font-mono font-bold text-lg uppercase tracking-tighter">{data.title}</h1>
                 <div className="flex gap-4 text-[10px] font-mono mt-1 text-gray-600 uppercase">
-                    <span>AREA: {data.totalAreaSqm} M²</span>
+                    <span>AREA: {formatArea(data.totalAreaSqm)}</span>
                     <span>FLOOR: {activeFloor}/{totalFloors}</span>
                 </div>
             </div>

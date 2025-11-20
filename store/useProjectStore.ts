@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room } from '../types';
+import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room, UnitSystem } from '../types';
 import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from '../services/geminiService';
 import { MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY } from '../dev/mockData';
 
@@ -14,6 +14,9 @@ interface ProjectState {
   // Selection
   selection: Selection | null;
 
+  // Global Settings
+  unitSystem: UnitSystem;
+
   // Async Status
   isGenerating: boolean;
   error: string | null;
@@ -22,6 +25,7 @@ interface ProjectState {
   // Actions
   setSelection: (selection: Selection | null) => void;
   setCurrentOptionIndex: (index: number) => void;
+  setUnitSystem: (system: UnitSystem) => void;
   failGeneration: (error: string) => void;
   updateOptionStatus: (index: number, option: SketchOption) => void;
 
@@ -50,6 +54,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   history: [],
   future: [],
   selection: null,
+  unitSystem: 'metric',
   isGenerating: false,
   error: null,
   lastPrompt: '',
@@ -61,6 +66,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   setSelection: (selection) => set({ selection }),
+  setUnitSystem: (unitSystem) => set({ unitSystem }),
   
   setCurrentOptionIndex: (index) => set((state) => {
       // When switching variations, clear history to avoid mixing timelines

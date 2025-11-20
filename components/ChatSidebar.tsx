@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
 import { THEME } from '../theme';
@@ -7,7 +8,7 @@ import { Send, Loader2, MessageSquare, ClipboardList, ChevronDown, ChevronUp, Ru
 type InputMode = 'chat' | 'form' | 'upload';
 
 const ChatSidebar: React.FC = () => {
-  const { isGenerating, generateByPrompt, generateByFile } = useProjectStore();
+  const { isGenerating, generateByPrompt, generateByFile, unitSystem, setUnitSystem } = useProjectStore();
   
   const [mode, setMode] = useState<InputMode>('chat');
   
@@ -29,7 +30,7 @@ const ChatSidebar: React.FC = () => {
 
   // Form State
   const [formData, setFormData] = useState({
-    unit: 'Metric (m²)', buildingType: 'Apartment', area: 120, floors: 1, ceilingHeight: 2.8,
+    buildingType: 'Apartment', area: 120, floors: 1, ceilingHeight: 2.8,
     roofType: 'Modern Flat', bedrooms: 2, bathrooms: 1,
     hasLivingRoom: true, hasKitchen: true, hasDining: true, hasStudy: false,
     hasBalcony: false, hasGarden: false, hasParking: false, hasStorage: false,
@@ -55,9 +56,15 @@ const ChatSidebar: React.FC = () => {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isGenerating) return;
+
+    // Unit Conversion for AI Prompt (AI works in metric/cm)
+    const areaMetric = unitSystem === 'imperial' ? Math.round(formData.area / 10.764) : formData.area;
+    const heightMetric = unitSystem === 'imperial' ? (formData.ceilingHeight * 0.3048).toFixed(2) : formData.ceilingHeight;
+    const unitLabel = unitSystem === 'imperial' ? 'sq ft' : 'm²';
+
     let prompt = `Generate a ${formData.designStyle} ${formData.buildingType} with ${formData.floors} floor(s). `;
     if (['Villa', 'Duplex', 'Cottage'].includes(formData.buildingType)) prompt += `Roof Style: ${formData.roofType}. `;
-    prompt += `Total Area: ${formData.area} ${formData.unit}. Ceiling Height: ${formData.ceilingHeight}m. `;
+    prompt += `Total Area: ${areaMetric} m² (${formData.area} ${unitLabel} requested). Ceiling Height: ${heightMetric}m. `;
     prompt += `\nRequired Spaces: Bedrooms: ${formData.bedrooms}, Bathrooms: ${formData.bathrooms}`;
     if (formData.hasLivingRoom) prompt += `, Open Plan Living Room`;
     if (formData.hasKitchen) prompt += `, Kitchen`;
@@ -83,6 +90,8 @@ const ChatSidebar: React.FC = () => {
     uploadFiles.forEach(file => generateByFile(file));
     setUploadFiles([]);
   };
+
+  const isImperial = unitSystem === 'imperial';
 
   return (
     <div className="flex flex-col h-full bg-white z-10">
@@ -153,6 +162,13 @@ const ChatSidebar: React.FC = () => {
         <div className="flex-1 flex flex-col bg-white overflow-hidden">
            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
              <form id="spec-form" onSubmit={handleFormSubmit} className="space-y-3">
+                
+                {/* Unit Selector */}
+                <div className="flex gap-2 mb-4">
+                     <button type="button" onClick={() => setUnitSystem('metric')} className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wide rounded border ${unitSystem === 'metric' ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}>Metric (m²)</button>
+                     <button type="button" onClick={() => setUnitSystem('imperial')} className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wide rounded border ${unitSystem === 'imperial' ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}>Imperial (ft²)</button>
+                </div>
+
                 {/* Form content */}
                 <div className={THEME.card}>
                    <div onClick={() => toggleSection('specs')} className={THEME.sectionHeader}>
@@ -170,13 +186,17 @@ const ChatSidebar: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                   <label className={THEME.label}>Area (m²)</label>
+                                   <label className={THEME.label}>{isImperial ? 'Area (sq ft)' : 'Area (m²)'}</label>
                                    <input type="number" className={THEME.input} value={formData.area} onChange={e => setFormData({...formData, area: Number(e.target.value)})}/>
                                 </div>
                                 <div>
                                    <label className={THEME.label}>Floors</label>
                                    <input type="number" min="1" max="5" className={THEME.input} value={formData.floors} onChange={e => setFormData({...formData, floors: Number(e.target.value)})}/>
                                 </div>
+                            </div>
+                            <div>
+                                <label className={THEME.label}>{isImperial ? 'Ceiling Height (ft)' : 'Ceiling Height (m)'}</label>
+                                <input type="number" step="0.1" className={THEME.input} value={formData.ceilingHeight} onChange={e => setFormData({...formData, ceilingHeight: Number(e.target.value)})}/>
                             </div>
                         </div>
                      </div>

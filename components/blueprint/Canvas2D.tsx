@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { SketchData, Room } from '../../types';
+import { useProjectStore } from '../../store/useProjectStore';
 
 const WALL_STROKE_WIDTH = 15;
 const DIM_COLOR = "#444";
@@ -21,7 +22,18 @@ interface Canvas2DProps {
   selectedId?: string;
 }
 
-const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, value: number, offset?: number}> = ({ x1, y1, x2, y2, value, offset = 20 }) => {
+// Helper to format dimensions based on unit system
+const formatDimension = (cm: number, unitSystem: 'metric' | 'imperial') => {
+    if (unitSystem === 'imperial') {
+        const totalFeet = cm * 0.0328084;
+        const feet = Math.floor(totalFeet);
+        const inches = Math.round((totalFeet - feet) * 12);
+        return `${feet}' ${inches}"`;
+    }
+    return Math.round(cm).toString();
+};
+
+const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, value: number, offset?: number, unitSystem: 'metric' | 'imperial'}> = ({ x1, y1, x2, y2, value, offset = 20, unitSystem }) => {
     const isVertical = Math.abs(x1 - x2) < 1;
     const angle = isVertical ? -90 : 0;
     const mx = (x1 + x2) / 2;
@@ -41,7 +53,7 @@ const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, v
             <line x1={x1} y1={y1} x2={sx1} y2={sy1} stroke={DIM_COLOR} strokeWidth="0.2" strokeDasharray="4,2" />
             <line x1={x2} y1={y2} x2={sx2} y2={sy2} stroke={DIM_COLOR} strokeWidth="0.2" strokeDasharray="4,2" />
             <text x={mx - dx - (isVertical?5:0)} y={my - dy - (isVertical?0:5)} textAnchor="middle" fill={DIM_COLOR} fontSize={DIM_FONT_SIZE} fontFamily="monospace" fontWeight="bold" transform={`rotate(${angle} ${mx - dx} ${my - dy})`}>
-                {Math.round(value)}
+                {formatDimension(value, unitSystem)}
             </text>
         </g>
     );
@@ -95,9 +107,18 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
   svgRef, data, activeFloor, pan, scale, rotation, 
   onMouseDown, onMouseMove, onMouseUp, onWheel, bounds, selectedId
 }) => {
+  const { unitSystem } = useProjectStore(); // Access global unit preference
   
   const visibleRooms = data.rooms.filter(r => r.floor === activeFloor);
   const visibleElements = data.elements.filter(e => e.floor === activeFloor);
+
+  const getAreaText = (width: number, height: number) => {
+      const areaSqm = (width * height) / 10000;
+      if (unitSystem === 'imperial') {
+          return `${Math.round(areaSqm * 10.764)} sq ft`;
+      }
+      return `${Math.round(areaSqm)}m²`;
+  };
 
   return (
       <svg
@@ -206,12 +227,18 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     {room.name.toUpperCase()}
                   </text>
                   <text x={room.width/2} y={room.height/2 + 15} textAnchor="middle" className="font-mono text-[10px] fill-gray-500 pointer-events-none select-none">
-                    {Math.round((room.width * room.height) / 10000)}m²
+                    {getAreaText(room.width, room.height)}
                   </text>
                   {room.label && (
                      <text x={room.width/2} y={room.height/2 + 30} textAnchor="middle" className="font-mono text-[10px] fill-blue-600 font-bold pointer-events-none select-none tracking-tight">
                         {room.label.toUpperCase()}
                      </text>
+                  )}
+                  {/* Show Dimensions when selected */}
+                  {isSelected && (
+                      <text x={room.width/2} y={-10} textAnchor="middle" className="font-mono text-[10px] fill-blue-500 font-bold pointer-events-none select-none">
+                          {formatDimension(room.width, unitSystem)} x {formatDimension(room.height, unitSystem)}
+                      </text>
                   )}
                   
                   {isSelected && (
@@ -289,8 +316,8 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
             {/* Dimensions Layer */}
             {visibleRooms.length > 0 && (
                 <g className="opacity-60">
-                    <DimensionLine x1={bounds.minX} y1={bounds.minY - 50} x2={bounds.maxX} y2={bounds.minY - 50} value={bounds.maxX - bounds.minX} offset={0} />
-                    <DimensionLine x1={bounds.minX - 50} y1={bounds.minY} x2={bounds.minX - 50} y2={bounds.maxY} value={bounds.maxY - bounds.minY} offset={0} />
+                    <DimensionLine x1={bounds.minX} y1={bounds.minY - 50} x2={bounds.maxX} y2={bounds.minY - 50} value={bounds.maxX - bounds.minX} offset={0} unitSystem={unitSystem} />
+                    <DimensionLine x1={bounds.minX - 50} y1={bounds.minY} x2={bounds.minX - 50} y2={bounds.maxY} value={bounds.maxY - bounds.minY} offset={0} unitSystem={unitSystem} />
                 </g>
             )}
           </g>
