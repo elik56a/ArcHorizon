@@ -6,7 +6,8 @@ import {
   Settings2, Trash2, Box, LayoutGrid,
   DoorOpen, Maximize2, BedDouble, Bed, Sofa, 
   Utensils, Monitor, Archive, Bath, ShowerHead, 
-  Waves, Flame, Move, Trees, Palette, Car, Armchair
+  Waves, Flame, Move, Trees, Palette, Car, Armchair,
+  Lamp, Tv, Refrigerator
 } from 'lucide-react';
 
 const RightSidePanel: React.FC = () => {
@@ -43,7 +44,7 @@ const RightSidePanel: React.FC = () => {
                  <input type="text" value={(item as any).name || ''} onChange={(e) => updateItem(item.id, selection.type, 'name', e.target.value)} className={THEME.input} placeholder="Room Name" />
               )}
               {selection.type === 'element' && (
-                  <div className="text-sm text-gray-500 italic py-1 mb-2">ID: {item.id}</div>
+                  <div className="text-sm text-gray-500 italic py-1 mb-2">Type: {item.type}</div>
               )}
               <div className="mt-2">
                  <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 block">Label</label>
@@ -175,33 +176,38 @@ const RightSidePanel: React.FC = () => {
           case 'parking': return <Car size={20} />;
           case 'pool': return <Waves size={20} />;
           
-          case 'door': return <DoorOpen size={20} />;
-          case 'entry_door': return <DoorOpen size={20} strokeWidth={2.5} />;
+          case 'door': 
+          case 'entry_door': return <DoorOpen size={20} />;
           case 'window': return <Maximize2 size={20} />;
           case 'stairs_up': return <Move size={20} className="-rotate-45" />;
           
           case 'bed_king': return <BedDouble size={20} />;
           case 'bed_single': return <Bed size={20} />;
+          case 'nightstand': return <Box size={16} />;
+          
           case 'sofa': return <Sofa size={20} />;
+          case 'sofa_l_shape': return <Sofa size={20} />;
+          case 'tv_unit': return <Tv size={20} />;
           case 'dining_table': return <Utensils size={20} />;
           case 'desk': return <Monitor size={20} />;
           case 'wardrobe': return <Archive size={20} />;
           
           case 'toilet': return <Bath size={20} className="scale-75" />;
-          case 'sink': return <Waves size={20} />;
+          case 'sink_single': return <Waves size={20} />;
           case 'bathtub': return <Bath size={20} />;
           case 'shower': return <ShowerHead size={20} />;
           case 'stove': return <Flame size={20} />;
+          case 'fridge': return <Refrigerator size={20} />;
           default: return <Box size={20} />;
       }
   };
 
-  const structuralZones = ['living', 'kitchen', 'bedroom', 'bathroom', 'dining', 'garden', 'parking', 'pool'];
+  const structuralZones = ['living', 'kitchen', 'bedroom', 'bathroom', 'dining', 'garden', 'parking', 'utility'];
 
   const libraryCategories = {
-     'Openings': ['door', 'window', 'entry_door', 'stairs_up'],
-     'Furniture': ['bed_king', 'bed_single', 'sofa', 'dining_table', 'desk', 'wardrobe'],
-     'Utilities': ['toilet', 'sink', 'bathtub', 'shower', 'stove']
+     'Openings': ['door', 'entry_door', 'sliding_door', 'window', 'stairs_up'],
+     'Furniture': ['bed_king', 'bed_single', 'nightstand', 'sofa', 'sofa_l_shape', 'armchair', 'dining_table', 'tv_unit', 'wardrobe', 'desk'],
+     'Wet Areas': ['toilet', 'sink_single', 'shower', 'bathtub', 'stove', 'fridge', 'kitchen_island']
   };
 
   return (
@@ -211,7 +217,7 @@ const RightSidePanel: React.FC = () => {
               <LayoutGrid size={14} /> Component Library
            </div>
            <h2 className="text-lg font-bold text-gray-900">Add Elements</h2>
-           <p className="text-xs text-gray-500 mt-1">Click to add to center of active floor</p>
+           <p className="text-xs text-gray-500 mt-1">Drag or click to add to active floor</p>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-8">
@@ -219,7 +225,7 @@ const RightSidePanel: React.FC = () => {
           {/* Top Section: Structural Zones */}
           <div>
              <h3 className="text-[11px] font-bold uppercase text-gray-800 bg-gray-100 py-1.5 px-2 rounded mb-3 tracking-wider flex items-center gap-2 border border-gray-200">
-                <Box size={12} className="text-blue-600"/> Structural Zones
+                <Box size={12} className="text-blue-600"/> Room Zones
              </h3>
              <div className="grid grid-cols-2 gap-2">
                 {structuralZones.map((t) => (
@@ -249,12 +255,12 @@ const RightSidePanel: React.FC = () => {
                         key={t}
                         onClick={() => addItem(t as any, 'element')}
                         className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md transition-all group bg-white aspect-square"
-                        title={`Add ${t.replace('_', ' ')}`}
+                        title={`Add ${t.replace(/_/g, ' ')}`}
                       >
                          <div className="text-gray-600 group-hover:text-blue-600 transition-colors">
                             {getIconForType(t)}
                          </div>
-                         <span className="text-[10px] font-medium text-gray-600 text-center capitalize leading-tight group-hover:text-blue-700">
+                         <span className="text-[10px] font-medium text-gray-600 text-center capitalize leading-tight group-hover:text-blue-700 overflow-hidden text-ellipsis w-full">
                             {t.replace(/_/g, ' ')}
                          </span>
                       </button>

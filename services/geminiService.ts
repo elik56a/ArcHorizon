@@ -23,7 +23,7 @@ const RESPONSE_SCHEMA = {
           id: { type: Type.STRING },
           name: { type: Type.STRING },
           floor: { type: Type.INTEGER },
-          floorFinish: { type: Type.STRING, enum: ['tiled', 'wood', 'carpet', 'concrete', 'grass', 'paved'] },
+          floorFinish: { type: Type.STRING, enum: ['tiled', 'wood', 'carpet', 'concrete', 'grass', 'paved', 'marble'] },
           width: { type: Type.NUMBER },
           height: { type: Type.NUMBER },
           x: { type: Type.NUMBER },
@@ -74,34 +74,31 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `
-      ROLE: Award-Winning Senior Architect & Spatial Designer.
-      TASK: Create a High-End, Creative Architectural Blueprint based on: "${prompt}".
+      ROLE: Senior Architectural CAD Technician.
+      TASK: Generate a detailed construction-grade floor plan based on: "${prompt}".
       
-      DESIGN PHILOSOPHY (CRITICAL):
-      1. **ANTI-BOREDOM**: Do NOT create a box with a hallway in the middle. Use L-shapes, U-shapes, or courtyards.
-      2. **OPEN PLAN**: Combine Living, Dining, and Kitchen into a cohesive, airy flow. Avoid unnecessary walls.
-      3. **NATURAL LIGHT**: Prioritize windows. Every habitable room MUST have windows.
-      4. **ZONING**: Separate private areas (Bedrooms) from public areas (Living).
+      CRITICAL DESIGN STANDARDS:
+      1. **REALISM**: Do not generate empty boxes. Every room must be furnished with specific CAD blocks.
+      2. **STRUCTURAL LOGIC**: Walls should align. Wet areas (Kitchen/Bath) should share plumbing walls where possible.
+      3. **CIRCULATION**: Ensure clear walking paths (min 90cm) between furniture.
       
-      OUTDOOR & PRIVATE HOUSE REQUIREMENTS:
-      1. **GARDEN**: If the request implies a house/villa, you MUST generate a room with type 'garden'. It should wrap around or sit adjacent to the living area.
-      2. **PARKING**: If requested, generate a 'parking' zone (paved surface) near the entry.
-      3. **TERRACES**: Upper floors should have balconies/terraces (type 'balcony') overlooking the garden.
+      DETAILED FURNITURE REQUIREMENTS (Use these specific types):
+      - **BEDROOM**: 'bed_king' or 'bed_single', plus 'nightstand' (x2), 'wardrobe' (large rect).
+      - **LIVING**: 'sofa' or 'sofa_l_shape', 'coffee_table', 'tv_unit', 'armchair'.
+      - **KITCHEN**: 'kitchen_island' (if space permits), 'stove', 'fridge', 'kitchen_sink' (on counter).
+      - **BATHROOM**: 'toilet' (against wall), 'sink_single' or 'sink_double', 'shower' (corner or box), 'bathtub'.
+      - **DINING**: 'dining_table' (include space for chairs).
       
-      TECHNICAL RULES:
-      1. **SCALE**: 1 unit = 1 cm.
-      2. **COORDINATES**: Multiples of 10. No gaps between adjacent rooms. Walls must touch.
-      3. **ROOM TYPES**: Use specific types: 'garden' (outdoor green), 'parking' (driveway), 'balcony' (outdoor), 'terrace'.
-      4. **FLOORING**: 
-         - Garden = 'grass'
-         - Parking = 'paved'
-         - Living = 'wood' or 'tiled'
-         - Bedrooms = 'wood' or 'carpet'
+      DIMENSIONING RULES (Unit = CM):
+      - External Walls: 20-30cm thickness implied.
+      - Internal Walls: 10-15cm thickness implied.
+      - Doors: Standard width 80-90cm. Entry door 100cm.
+      - Windows: Align with furniture layouts (e.g., not behind a tall wardrobe).
       
-      MANDATORY ELEMENTS:
-      - **WINDOWS**: Place them logically on exterior walls.
-      - **DOORS**: Connect rooms. Use 'open' connections for Living/Dining/Kitchen flow.
-      - **FURNITURE**: Fully furnish the house. Beds in bedrooms, Sofa/TV in living, Dining Table, Toilets, etc.
+      LAYOUT GUIDANCE:
+      - Create distinct 'zones' but allow flow.
+      - Use 'corridor' rooms to connect private areas.
+      - Ensure balconies ('balcony') are accessible via 'sliding_door' or 'door'.
       
       OUTPUT FORMAT: Pure JSON matching the schema.
       `,
@@ -135,14 +132,14 @@ export const generateSketchFromImage = async (base64Data: string, mimeType: stri
           },
           {
             text: `
-            ACT AS: Computer Vision Architect Specialist.
-            TASK: Digitize this floor plan into a JSON vector format.
+            ACT AS: Lead BIM Modeler.
+            TASK: Vectorize this raster floor plan into a CAD-ready JSON format.
             
-            RULES:
-            1. **OUTDOORS**: If you see a Garden or Patio, create a room with type 'garden' or 'terrace'.
-            2. **ACCURACY**: Mimic layout exactly.
-            3. **SCALE**: 1 unit = 1 cm.
-            4. **CONNECTIVITY**: Ensure rooms share coordinates (walls touch).
+            REQUIREMENTS:
+            1. **PRECISION**: Trace walls and rooms exactly.
+            2. **COMPONENT RECOGNITION**: Identify specific furniture (Toilets, Beds, Sofas) and use the correct 'type' enum (e.g., 'toilet', 'bed_queen').
+            3. **SCALE**: Estimate scale based on standard door widths (90cm).
+            4. **DETAILS**: Include 'nightstand', 'wardrobe', 'kitchen_sink' if visible.
             `
           }
         ]
@@ -171,12 +168,14 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
             model: 'gemini-2.5-flash',
             contents: `
             ACT AS: Senior CAD Interoperability Engineer.
-            TASK: Convert DXF content to JSON Schema.
+            TASK: Convert DXF entities to a semantic Architectural JSON Schema.
             
             INPUT:
             \`\`\`
             ${contentSample}
             \`\`\`
+            
+            INSTRUCTION: Extract Rooms and Furniture blocks. Map DXF blocks to specific types like 'toilet', 'bed_king', 'sofa'.
             `,
             config: {
                 responseMimeType: "application/json",
@@ -197,9 +196,9 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
 
 const getStyleInstruction = (style: DesignStyle): string => {
   switch(style) {
-    case 'Modern': return "Style: MODERN MINIMALIST. Flat roofs, boxy volumes, large glass facades, open plan living.";
-    case 'Rustic': return "Style: RUSTIC/TRADITIONAL. Pitched roof implication, cozy nooks, distinct room separation, warm flow.";
-    case 'Creative': return "Style: AVANT-GARDE. Non-rectangular rooms, angles, dynamic flow, unexpected courtyards.";
-    default: return "Standard layout.";
+    case 'Modern': return "Style: CONTEMPORARY. Clean lines, open plan, large glazing, kitchen islands, master suites with walk-in wardrobes.";
+    case 'Rustic': return "Style: TRADITIONAL/COUNTRY. Distinct rooms, thick walls, cozy layout, large dining areas, fireplaces.";
+    case 'Creative': return "Style: ARCHITECTURAL AVANT-GARDE. Courtyards, L-shapes, U-shapes, indoor-outdoor flow, specific furniture detailing.";
+    default: return "Standard professional layout.";
   }
 };

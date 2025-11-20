@@ -2,9 +2,9 @@
 export type RoomType = 
   | 'bedroom' | 'living' | 'kitchen' | 'bathroom' | 'corridor' 
   | 'balcony' | 'storage' | 'dining' | 'entry' | 'stairs'
-  | 'garden' | 'parking' | 'terrace' | 'pool';
+  | 'garden' | 'parking' | 'terrace' | 'pool' | 'utility';
 
-export type FloorFinish = 'tiled' | 'wood' | 'carpet' | 'concrete' | 'grass' | 'paved';
+export type FloorFinish = 'tiled' | 'wood' | 'carpet' | 'concrete' | 'grass' | 'paved' | 'marble';
 
 export interface Room {
   id: string;
@@ -28,10 +28,15 @@ export interface Connection {
 }
 
 export type ElementType = 
-  | 'door' | 'window' | 'entry_door' 
-  | 'bed_king' | 'bed_single' | 'sofa' | 'dining_table' 
-  | 'toilet' | 'sink' | 'stove' | 'desk' | 'wardrobe'
-  | 'stairs_up' | 'stairs_down' | 'bathtub' | 'shower';
+  | 'door' | 'window' | 'entry_door' | 'sliding_door' | 'pocket_door'
+  | 'bed_king' | 'bed_queen' | 'bed_single' | 'nightstand'
+  | 'sofa' | 'sofa_l_shape' | 'armchair' | 'coffee_table' | 'tv_unit'
+  | 'dining_table' | 'chair'
+  | 'toilet' | 'sink_single' | 'sink_double' | 'shower' | 'bathtub' | 'bathtub_corner'
+  | 'stove' | 'fridge' | 'kitchen_island' | 'kitchen_sink'
+  | 'washer' | 'dryer'
+  | 'desk' | 'wardrobe' | 'bookshelf'
+  | 'stairs_up' | 'stairs_down';
 
 export interface ArchitecturalElement {
   id: string;
