@@ -12,7 +12,7 @@ import { EditorPage } from './pages/EditorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 
-// Auth Guard Component
+// Auth Guard Component (Protects private routes)
 const ProtectedRoute = () => {
   const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) {
@@ -21,12 +21,21 @@ const ProtectedRoute = () => {
   return <Outlet />;
 };
 
+// Public/Root Route Guard (Redirects to app if already logged in)
+const RootRoute = () => {
+  const { isAuthenticated } = useAuthStore();
+  if (isAuthenticated) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+  return <LandingPage />;
+};
+
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
