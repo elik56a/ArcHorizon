@@ -1,11 +1,12 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ChatSidebar from './components/ChatSidebar';
-import BlueprintCanvas from './components/BlueprintCanvas';
+import BlueprintCanvas from './components/blueprint/BlueprintCanvas';
 import RightSidePanel from './components/RightSidePanel';
 import { SketchOption, SketchData, ElementType, RoomType } from './types';
 import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from './services/geminiService';
-import { Layout, Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { MOCK_ONE_STORY, MOCK_TWO_STORY } from './dev/mockData';
+import { Layout, Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Lock, Wrench } from 'lucide-react';
 
 const App: React.FC = () => {
   const [sketchOptions, setSketchOptions] = useState<SketchOption[]>([]);
@@ -236,6 +237,23 @@ const App: React.FC = () => {
     }
   };
 
+  // --- DEV TOOLS: LOAD MOCK DATA ---
+  const loadMockData = (mock: SketchData) => {
+      setIsGenerating(true);
+      setUiState(prev => ({ ...prev, bottomPanelOpen: false }));
+      
+      // Simulate a short load time for visual feedback
+      setTimeout(() => {
+          setSketchOptions([{ status: 'loaded', data: JSON.parse(JSON.stringify(mock)) }]);
+          setCurrentOptionIndex(0);
+          setHistory([]);
+          setFuture([]);
+          setSelection(null);
+          setUiState(prev => ({ ...prev, bottomPanelOpen: true }));
+          setIsGenerating(false);
+      }, 400);
+  };
+
   // --- ITEM CRUD Handlers ---
 
   const handleUpdateItem = (id: string, type: 'room' | 'element', field: string, value: any) => {
@@ -339,6 +357,25 @@ const App: React.FC = () => {
            </span>
         </div>
       </header>
+      
+      {/* DEV TOOLS OVERLAY */}
+      <div className="fixed top-20 right-40 z-[60] flex flex-col gap-2 opacity-40 hover:opacity-100 transition-opacity group">
+         <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-red-500 uppercase mb-1">
+            <Wrench size={10} /> Dev Tools
+         </div>
+         <button 
+            onClick={() => loadMockData(MOCK_ONE_STORY)} 
+            className="bg-white border-2 border-red-200 hover:border-red-500 text-gray-600 hover:text-red-500 text-[10px] font-bold px-3 py-2 rounded shadow-sm transition-all uppercase tracking-wide text-left"
+         >
+            1-Story Classic
+         </button>
+         <button 
+            onClick={() => loadMockData(MOCK_TWO_STORY)} 
+            className="bg-white border-2 border-blue-200 hover:border-blue-500 text-gray-600 hover:text-blue-500 text-[10px] font-bold px-3 py-2 rounded shadow-sm transition-all uppercase tracking-wide text-left"
+         >
+            2-Story Luxury
+         </button>
+      </div>
 
       {/* Main Workspace */}
       <main className="flex flex-1 overflow-hidden relative">

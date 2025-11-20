@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SketchData, Room, ArchitecturalElement } from '../../types';
 import { downloadDXF, downloadPDF, downloadSVG } from '../../services/exportService';
-import { Loader2, PenTool, Compass, Ruler, Box, Layers, LayoutTemplate, ArrowUpCircle } from 'lucide-react';
+import { PenTool, Compass, Box, Layers, LayoutTemplate, ArrowUpCircle } from 'lucide-react';
 import Canvas3D from './Canvas3D';
 import Canvas2D from './Canvas2D';
 import { ViewportHeader, ViewportToolbar, FloorSelector } from './BlueprintControls';
@@ -107,6 +107,10 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [resizeState, setResizeState] = useState<ResizeState | null>(null);
   const [hasMoved, setHasMoved] = useState(false);
+  
+  // Selection Logic State
+  const [potentialSelection, setPotentialSelection] = useState<{id: string, type: 'room' | 'element'} | null>(null);
+  const mouseDownPos = useRef<{x: number, y: number} | null>(null);
 
   // Toolbar Drag State
   const [toolbarPos, setToolbarPos] = useState<{x: number, y: number} | null>(null);
@@ -132,6 +136,11 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         cameraStateRef.current = null;
     }
   }, [data?.id]);
+
+  // Auto-disable "Show All Floors" when switching to 2D
+  useEffect(() => {
+      if (viewMode === '2d') setShowAllFloors(false);
+  }, [viewMode]);
 
   const getBounds = (rooms: Room[]) => {
     if (rooms.length === 0) return { minX: 0, maxX: 1000, minY: 0, maxY: 1000 };
@@ -224,7 +233,6 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
   const handleWheel = (e: React.WheelEvent) => {
     if (viewMode === '3d') return;
-    // Non-ctrl zoom support as per request
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
@@ -232,13 +240,18 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
     if (viewMode === '3d') return;
+    
+    // Always prevent default to stop native text selection or dragging
+    e.preventDefault();
     e.stopPropagation();
+
     setHasMoved(false);
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
 
     const modelPos = getModelCoordinates(e.clientX, e.clientY);
 
+    // 1. RESIZE LOGIC (Handles are only visible if selected)
     if (resizeHandle && id && type && localData) {
-        // RESIZE START
         const item = type === 'room' 
             ? localData.rooms.find(r => r.id === id) 
             : localData.elements.find(el => el.id === id);
@@ -254,17 +267,31 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
                 }
             });
         }
-    } else if (id && type && x !== undefined && y !== undefined) {
-        // DRAG START
-        setDragState({
-            id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y
-        });
-    } else {
-        // PAN START
-        setIsPanning(true);
-        setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-        if (onSelect) onSelect(null);
-    }
+        return;
+    } 
+    
+    // 2. CLICK ON ELEMENT/ROOM
+    if (id && type && x !== undefined && y !== undefined) {
+        // CRITICAL: Only allow dragging if the item is ALREADY selected.
+        if (id === selectedId) {
+             // ALREADY SELECTED -> START DRAG
+             setDragState({
+                id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y
+            });
+        } else {
+             // NOT SELECTED -> START PAN (Fallback) + POTENTIAL SELECTION
+             // We treat this as a Pan attempt first. If the user doesn't move the mouse, we select it on MouseUp.
+             setIsPanning(true);
+             setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+             setPotentialSelection({ id, type });
+        }
+        return;
+    } 
+    
+    // 3. CLICK BACKGROUND
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    if (onSelect) onSelect(null);
   };
 
   // --- TOOLBAR DRAG HANDLERS ---
@@ -272,7 +299,6 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
       e.preventDefault();
       e.stopPropagation();
       setIsDraggingToolbar(true);
-      // Calculate offset from the mouse to the toolbar's top-left corner
       const rect = (e.currentTarget.closest('.viewport-toolbar') as HTMLElement).getBoundingClientRect();
       setToolbarDragOffset({
           x: e.clientX - rect.left,
@@ -286,7 +312,7 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
           const x = e.clientX - containerRect.left - toolbarDragOffset.x;
           const y = e.clientY - containerRect.top - toolbarDragOffset.y;
           setToolbarPos({ x, y });
-          return; // Don't do other canvas moves
+          return; 
       }
   };
 
@@ -311,7 +337,20 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (viewMode === '3d' || isDraggingToolbar) return;
-    setHasMoved(true);
+    
+    // Movement Threshold to prevent jittery clicks (6px)
+    if (mouseDownPos.current) {
+        const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+        const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+        if (dx > 6 || dy > 6) {
+            setHasMoved(true);
+        }
+    }
+
+    // Only process moves if we crossed the threshold or are already moving
+    const isActuallyMoving = hasMoved || (mouseDownPos.current && (Math.abs(e.clientX - mouseDownPos.current.x) > 6 || Math.abs(e.clientY - mouseDownPos.current.y) > 6));
+
+    if (!isActuallyMoving) return;
     
     const modelPos = getModelCoordinates(e.clientX, e.clientY);
 
@@ -390,15 +429,23 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
   };
 
   const handleMouseUp = () => {
-    if (!hasMoved && !resizeState && dragState && onSelect) {
-        onSelect(dragState.id, dragState.type);
-    } else if (hasMoved && (dragState || resizeState) && localData) {
+    // 1. Handle Potential Selection (Clicked unselected item without moving significantly)
+    if (potentialSelection && !hasMoved && onSelect) {
+        onSelect(potentialSelection.id, potentialSelection.type);
+    } 
+    // 2. Handle Drag Finish (Only if we actually moved and had a state)
+    else if (hasMoved && (dragState || resizeState) && localData) {
         onUpdate(localData);
+        // Re-confirm selection after drag
         if (dragState && onSelect) onSelect(dragState.id, dragState.type);
     }
+    
     setDragState(null);
     setResizeState(null);
     setIsPanning(false);
+    setPotentialSelection(null);
+    setHasMoved(false);
+    mouseDownPos.current = null;
   };
 
   const handleDownload = (type: 'svg' | 'pdf' | 'dxf') => {
@@ -419,7 +466,6 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
     return (
       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200 p-10">
         <div className="max-w-lg w-full text-center space-y-8 opacity-60 hover:opacity-100 transition-opacity duration-700">
-            {/* Technical Graphic */}
             <div className="relative w-64 h-40 mx-auto border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
                 <div className="absolute inset-0 grid grid-cols-6 grid-rows-4 gap-px opacity-20">
                    {Array.from({length: 24}).map((_, i) => <div key={i} className="bg-gray-400/50"></div>)}
@@ -456,12 +502,15 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
     );
   }
 
-  const totalFloors = localData.floors || Math.max(...localData.rooms.map(r => r.floor), 1);
+  const totalFloors = Math.max(localData.floors || 0, ...localData.rooms.map(r => r.floor), 1);
   const currentFloorRooms = localData.rooms.filter(r => r.floor === activeFloor);
   const bounds = getBounds(currentFloorRooms);
 
   return (
-    <div className="flex-1 relative overflow-hidden bg-gray-100 h-full w-full" ref={containerRef}>
+    <div 
+        className={`flex-1 relative overflow-hidden bg-gray-100 h-full w-full ${isPanning ? 'cursor-grabbing' : 'cursor-default'}`} 
+        ref={containerRef}
+    >
       <ViewportHeader 
         data={localData} 
         activeFloor={activeFloor} 
@@ -489,8 +538,8 @@ const BlueprintCanvas: React.FC<BlueprintCanvasProps> = ({
         rotateCanvas={rotateCanvas}
         onFit={() => fitToScreen()}
         history={historyControl}
-        position={toolbarPos} // PASS POSITION
-        onDragStart={handleToolbarDragStart} // PASS DRAG HANDLER
+        position={toolbarPos} 
+        onDragStart={handleToolbarDragStart} 
       />
 
       {viewMode === '3d' ? (

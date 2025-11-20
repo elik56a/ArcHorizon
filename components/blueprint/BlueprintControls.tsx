@@ -86,34 +86,40 @@ export const FloorSelector: React.FC<{
     showAllFloors: boolean;
     onChange: (floor: number) => void;
     onToggleAll: () => void;
-    viewMode?: '2d' | '3d';
-}> = ({ totalFloors, activeFloor, showAllFloors, onChange, onToggleAll, viewMode = '2d' }) => {
+    viewMode: '2d' | '3d';
+}> = ({ totalFloors, activeFloor, showAllFloors, onChange, onToggleAll, viewMode }) => {
+    
+    // If there is only one floor, we don't need a floor selector at all
     if (totalFloors <= 1) return null;
 
     return (
         <div className="absolute left-6 top-32 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-2 z-30 flex flex-col gap-2">
-           <Layers size={16} className="mx-auto mb-1 text-gray-400"/>
+           <div className="flex items-center justify-center pb-1 border-b border-gray-100 mb-1">
+               <Layers size={16} className="text-gray-400"/>
+           </div>
+           
            {Array.from({length: totalFloors}, (_, i) => totalFloors - i).map(floor => (
               <button 
                 key={floor}
                 onClick={() => onChange(floor)}
-                className={`w-8 h-8 font-mono text-sm font-bold transition-all border-2 ${activeFloor === floor && !showAllFloors ? 'bg-black text-white border-black' : 'border-transparent hover:border-gray-200'}`}
+                title={`Go to Floor ${floor}`}
+                className={`w-8 h-8 font-mono text-sm font-bold transition-all border-2 rounded-md flex items-center justify-center ${activeFloor === floor && !showAllFloors ? 'bg-black text-white border-black' : 'border-transparent hover:bg-gray-100 text-black'}`}
               >
                 {floor}
               </button>
            ))}
            
+           {/* Show Whole Building Button: ONLY in 3D mode */}
            {viewMode === '3d' && (
-               <>
-                <div className="w-full h-px bg-gray-200 my-1"></div>
-                <button 
+               <div className="pt-1 mt-1 border-t border-gray-200 flex flex-col gap-1">
+                    <button 
                         onClick={onToggleAll}
-                        title="View Whole Building"
-                        className={`w-8 h-8 flex items-center justify-center transition-all border-2 ${showAllFloors ? 'bg-blue-600 text-white border-blue-600' : 'border-transparent hover:border-gray-200 text-gray-600'}`}
-                >
-                    <Building2 size={16} />
-                </button>
-               </>
+                        title="Toggle Whole Building View"
+                        className={`w-8 h-8 flex items-center justify-center transition-all border-2 rounded-md ${showAllFloors ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 border-gray-200 hover:border-gray-400 text-gray-600'}`}
+                    >
+                        <Building2 size={16} />
+                    </button>
+               </div>
            )}
         </div>
     );

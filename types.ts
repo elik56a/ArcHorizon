@@ -4,7 +4,20 @@ export interface Point {
   y: number;
 }
 
-export type RoomType = 'bedroom' | 'living' | 'kitchen' | 'bathroom' | 'corridor' | 'balcony' | 'storage' | 'dining' | 'entry' | 'other' | 'stairs';
+export type RoomType = 
+  | 'bedroom' 
+  | 'living' 
+  | 'kitchen' 
+  | 'bathroom' 
+  | 'corridor' 
+  | 'balcony' 
+  | 'storage' 
+  | 'dining' 
+  | 'entry' 
+  | 'stairs'
+  | 'garden'   // NEW
+  | 'parking'  // NEW
+  | 'terrace'; // NEW
 
 export interface Room {
   id: string;
@@ -15,7 +28,7 @@ export interface Room {
   y: number;
   type: RoomType;
   floor: number; // 1-based index (1 = Ground, 2 = 1st floor, etc.)
-  floorFinish?: 'tiled' | 'wood' | 'carpet' | 'concrete';
+  floorFinish?: 'tiled' | 'wood' | 'carpet' | 'concrete' | 'grass' | 'paved'; // Added grass/paved
   color?: string;
   opacity?: number;
 }

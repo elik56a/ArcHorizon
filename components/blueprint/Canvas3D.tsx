@@ -58,13 +58,9 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   const startPosRef = useRef<{x: number, y: number} | null>(null);
 
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-      // Don't stop propagation yet - allow orbit controls to potentially start
       startPosRef.current = { x: e.clientX, y: e.clientY };
-
-      // Start Long Press Timer (500ms)
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-          // Trigger Drag Mode
           onPointerDown(e, id); 
           timerRef.current = null;
       }, 500);
@@ -78,7 +74,6 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
   };
 
   const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-      // Cancel long press if moved significantly (Orbiting)
       if (timerRef.current && startPosRef.current) {
           const dx = Math.abs(e.clientX - startPosRef.current.x);
           const dy = Math.abs(e.clientY - startPosRef.current.y);
@@ -89,12 +84,8 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
       }
   };
 
-  // Wrapper to register ref
-  const setRef = (el: any) => {
-      if (el) elementRefs.current[id] = el;
-  };
+  const setRef = (el: any) => { if (el) elementRefs.current[id] = el; };
 
-  // Inner content based on type
   const renderContent = () => {
       switch (type) {
         case 'bed_king':
@@ -261,10 +252,9 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
         onPointerUp={handlePointerUp}
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerUp}
-        onClick={(e) => e.stopPropagation()} // Stop clicks from doing anything
+        onClick={(e) => e.stopPropagation()}
     >
         {renderContent()}
-        {/* Invisible hit box for easier selection */}
         <mesh visible={false}>
             <boxGeometry args={[width, 100, height]} />
         </mesh>
@@ -273,40 +263,57 @@ const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRe
 };
 
 const Room3D: React.FC<{ room: Room, yOffset: number }> = ({ room, yOffset }) => {
-  const { x, y, width, height, floorFinish, color } = room;
+  const { x, y, width, height, floorFinish, color, type } = room;
   const px = x + width / 2;
   const pz = y + height / 2;
   const floorY = 0.5 + yOffset;
 
-  const floorColor = color || (
-    floorFinish === 'tiled' ? '#e0e0e0' : 
-    floorFinish === 'wood' ? '#d4a373' :
-    floorFinish === 'concrete' ? '#999' :
-    '#f5f5f5');
+  const isGarden = type === 'garden';
+  const isParking = type === 'parking';
+  const isBalcony = type === 'balcony' || type === 'terrace';
 
+  // Determine Floor Color
+  let floorColor = '#f5f5f5';
+  if (color) floorColor = color;
+  else if (isGarden) floorColor = '#4ade80'; // Green
+  else if (isParking) floorColor = '#9ca3af'; // Asphalt Gray
+  else if (floorFinish === 'wood') floorColor = '#d4a373';
+  else if (floorFinish === 'tiled') floorColor = '#e0e0e0';
+  else if (floorFinish === 'concrete') floorColor = '#999';
+  
+  // Determine Wall Configuration
+  const hasWalls = !isGarden && !isParking;
+  const wallHeight = isBalcony ? 110 : WALL_HEIGHT; // Balcony walls are lower
+  
   return (
     <group>
+       {/* Floor Plane */}
        <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[px, floorY, pz]}>
           <planeGeometry args={[width, height]} />
-          <meshStandardMaterial color={floorColor} roughness={0.8} />
+          <meshStandardMaterial color={floorColor} roughness={isGarden ? 1 : 0.5} />
        </mesh>
 
-       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2 + yOffset, y]}>
-          <boxGeometry args={[width + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS]} />
-          <meshStandardMaterial color="white" />
-       </mesh>
-       <mesh castShadow receiveShadow position={[px, WALL_HEIGHT/2 + yOffset, y + height]}>
-          <boxGeometry args={[width + WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS]} />
-          <meshStandardMaterial color="white" />
-       </mesh>
-       <mesh castShadow receiveShadow position={[x, WALL_HEIGHT/2 + yOffset, pz]}>
-          <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, height - WALL_THICKNESS]} />
-          <meshStandardMaterial color="white" />
-       </mesh>
-       <mesh castShadow receiveShadow position={[x + width, WALL_HEIGHT/2 + yOffset, pz]}>
-          <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, height - WALL_THICKNESS]} />
-          <meshStandardMaterial color="white" />
-       </mesh>
+       {/* Walls (Only for non-outdoor ground areas) */}
+       {hasWalls && (
+           <group>
+               <mesh castShadow receiveShadow position={[px, wallHeight/2 + yOffset, y]}>
+                  <boxGeometry args={[width + WALL_THICKNESS, wallHeight, WALL_THICKNESS]} />
+                  <meshStandardMaterial color="white" />
+               </mesh>
+               <mesh castShadow receiveShadow position={[px, wallHeight/2 + yOffset, y + height]}>
+                  <boxGeometry args={[width + WALL_THICKNESS, wallHeight, WALL_THICKNESS]} />
+                  <meshStandardMaterial color="white" />
+               </mesh>
+               <mesh castShadow receiveShadow position={[x, wallHeight/2 + yOffset, pz]}>
+                  <boxGeometry args={[WALL_THICKNESS, wallHeight, height - WALL_THICKNESS]} />
+                  <meshStandardMaterial color="white" />
+               </mesh>
+               <mesh castShadow receiveShadow position={[x + width, wallHeight/2 + yOffset, pz]}>
+                  <boxGeometry args={[WALL_THICKNESS, wallHeight, height - WALL_THICKNESS]} />
+                  <meshStandardMaterial color="white" />
+               </mesh>
+           </group>
+       )}
     </group>
   );
 };
@@ -321,35 +328,25 @@ interface SceneSetupProps {
 const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneSetupProps) => {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls);
-  
-  // Track previous project ID to know when to reset vs restore
   const lastProjectRef = useRef<string | null>(null);
-  // Track previous floor to calculate relative vertical shift
-  const prevFloorRef = useRef<number>(activeFloor);
 
-  // Save camera state on unmount
   useEffect(() => {
       return () => {
           if (controls && camera && cameraStateRef) {
              // @ts-ignore
-             const target = controls.target.clone();
-             const position = camera.position.clone();
-             cameraStateRef.current = { position, target };
+             cameraStateRef.current = { position: camera.position.clone(), target: controls.target.clone() };
           }
       };
   }, []); 
 
-  // INITIAL LOAD / PROJECT CHANGE
   useEffect(() => {
      if (!data || data.rooms.length === 0) return;
      const isNewProject = data.id !== lastProjectRef.current;
 
      if (isNewProject) {
          lastProjectRef.current = data.id;
-         prevFloorRef.current = activeFloor;
 
          if (!cameraStateRef?.current) {
-             // FIT TO BOUNDS (Initial Centering)
              const minX = Math.min(...data.rooms.map(r => r.x));
              const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
              const minY = Math.min(...data.rooms.map(r => r.y));
@@ -361,25 +358,20 @@ const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneS
              const centerZ = minY + depth / 2;
              
              const currentFloorY = (activeFloor - 1) * FLOOR_PITCH;
-             
              // @ts-ignore
-             const aspect = camera.aspect || 1;
-             const aspectFactor = aspect < 1 ? 1 / aspect : 1;
+             const aspectFactor = (camera.aspect < 1 ? 1/camera.aspect : 1);
              const fitOffset = Math.max(width, depth) * 0.8 * aspectFactor;
 
-             // Set initial camera looking at floor center
              camera.position.set(centerX, currentFloorY + fitOffset, centerZ + fitOffset);
              camera.lookAt(centerX, currentFloorY, centerZ);
              
              if (controls) {
-                // CRITICAL: Set target to Floor Y, not 0. This prevents "pulling" feeling.
                 // @ts-ignore
                 controls.target.set(centerX, currentFloorY, centerZ);
                 // @ts-ignore
                 controls.update();
              }
          } else {
-             // Restore from saved state
              camera.position.copy(cameraStateRef.current.position);
              // @ts-ignore
              controls.target.copy(cameraStateRef.current.target);
@@ -389,30 +381,20 @@ const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneS
      }
   }, [data.id]);
 
-  // FLOOR CHANGE / WHOLE BUILDING TOGGLE logic
   useEffect(() => {
       if (!controls) return;
-
-      // Calculate floor difference to shift camera vertically
-      const floorDiff = showAllFloors ? 0 : (activeFloor - prevFloorRef.current);
+      const targetHeight = (activeFloor - 1) * FLOOR_PITCH;
+      // @ts-ignore
+      const currentTargetY = controls.target.y;
+      const heightDiff = targetHeight - currentTargetY;
       
-      // Update Ref
-      prevFloorRef.current = activeFloor;
-      
-      if (floorDiff !== 0) {
-          // Shift camera vertically to match new floor height
-          const yShift = floorDiff * FLOOR_PITCH;
-          
-          camera.position.y += yShift;
-          // @ts-ignore
-          controls.target.y += yShift;
-          // @ts-ignore
-          controls.update();
-      } else if (showAllFloors) {
-           // If showing all floors, maybe center vertically on building?
-           // For now we leave it where it is to avoid disorientation
+      if (!showAllFloors && Math.abs(heightDiff) > 1) {
+           camera.position.y += heightDiff;
+           // @ts-ignore
+           controls.target.y += heightDiff;
+           // @ts-ignore
+           controls.update();
       }
-
   }, [activeFloor, showAllFloors]);
 
   return null;
@@ -425,33 +407,23 @@ const DragManager: React.FC<{
     dragState: { id: string | null, offset: THREE.Vector3 | null },
     setDragState: React.Dispatch<React.SetStateAction<{ id: string | null, offset: THREE.Vector3 | null }>>
 }> = ({ onUpdate, data, elementRefs, dragState, setDragState }) => {
-    const { camera, controls } = useThree();
-
     const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
         if (!dragState.id) return;
-        e.stopPropagation(); // Stop other interactions while dragging
-        
+        e.stopPropagation();
         const elGroup = elementRefs.current[dragState.id];
         if (!elGroup) return;
 
-        // Calculate Offset on first move to prevent jump
         let currentOffset = dragState.offset;
         if (!currentOffset) {
-             // Calculate offset relative to the object's current position
              currentOffset = e.point.clone().sub(elGroup.position);
              currentOffset.y = 0; 
              setDragState(prev => ({ ...prev, offset: currentOffset }));
-             return; // Skip first frame to allow state update
+             return;
         }
-
         const point = e.point;
         const newPos = point.sub(currentOffset);
-        
-        // Snap
         const snappedX = Math.round(newPos.x / 10) * 10;
         const snappedZ = Math.round(newPos.z / 10) * 10;
-
-        // Update visual only (direct manipulation)
         elGroup.position.x = snappedX;
         elGroup.position.z = snappedZ;
     };
@@ -459,26 +431,20 @@ const DragManager: React.FC<{
     const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
         if (!dragState.id) return;
         e.stopPropagation();
-
         const elGroup = elementRefs.current[dragState.id];
         if (elGroup) {
             const finalX = elGroup.position.x;
             const finalZ = elGroup.position.z;
-
-            // Find element config to calculate top-left
             const elConfig = data.elements.find(el => el.id === dragState.id);
             if (elConfig) {
                 const newX = finalX - elConfig.width / 2;
                 const newY = finalZ - elConfig.height / 2;
-
-                // Commit to state
                 const newElements = data.elements.map(el => 
                     el.id === dragState.id ? { ...el, x: newX, y: newY } : el
                 );
                 onUpdate({ ...data, elements: newElements });
             }
         }
-
         setDragState({ id: null, offset: null });
     };
 
@@ -486,10 +452,9 @@ const DragManager: React.FC<{
         <mesh 
             rotation={[-Math.PI / 2, 0, 0]} 
             position={[0, 0, 0]} 
-            visible={!!dragState.id} // Only active during drag
+            visible={!!dragState.id} 
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            // IMPORTANT: Catch initial clicks on the drag plane if the user moves quickly
             onPointerDown={(e) => e.stopPropagation()}
         >
             <planeGeometry args={[100000, 100000]} />
@@ -499,21 +464,13 @@ const DragManager: React.FC<{
 };
 
 const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
-  // Multi-floor Logic
-  const visibleRooms = showAllFloors 
-    ? data.rooms 
-    : data.rooms.filter(r => r.floor === activeFloor);
-    
-  const visibleElements = showAllFloors 
-    ? data.elements 
-    : data.elements.filter(e => e.floor === activeFloor);
-
+  const visibleRooms = showAllFloors ? data.rooms : data.rooms.filter(r => r.floor === activeFloor);
+  const visibleElements = showAllFloors ? data.elements : data.elements.filter(e => e.floor === activeFloor);
   const elementRefs = useRef<{[key: string]: THREE.Group}>({});
   const [dragState, setDragState] = useState<{id: string | null, offset: THREE.Vector3 | null}>({ id: null, offset: null });
 
   const handleElementDown = (e: ThreeEvent<PointerEvent>, id: string) => {
       if (!onUpdate) return;
-      // Start drag state with null offset; let DragManager calculate it on first move
       setDragState({ id, offset: null });
   };
 
@@ -558,7 +515,6 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = 
                   <Grid3D position={[0, -1, 0]} infiniteGrid fadeDistance={50000} cellColor="#bbb" sectionColor="#999" />
                   <ContactShadows resolution={1024} scale={10000} blur={2} opacity={0.5} far={100} color="#000000" />
                   
-                  {/* Drag Logic Layer */}
                   {onUpdate && (
                       <DragLogicWrapper 
                         onUpdate={onUpdate} 
@@ -570,7 +526,6 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = 
                   )}
                </group>
                
-               {/* OrbitControls: Disabled when dragging to prevent camera fight */}
                <OrbitControls 
                   makeDefault 
                   minPolarAngle={0} 
@@ -584,7 +539,6 @@ const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = 
   );
 };
 
-// Helper to access useThree inside the canvas
 const DragLogicWrapper: React.FC<any> = (props) => {
     return <DragManager {...props} />;
 };

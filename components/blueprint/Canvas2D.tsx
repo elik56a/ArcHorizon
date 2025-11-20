@@ -58,36 +58,21 @@ interface ResizeHandlesProps {
 const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, rotation, onResizeStart, scale }) => {
     const handleSize = 8 / scale; // Keep constant visual size
     const offset = handleSize / 2;
-    
-    // Standard cursor sequence (0 deg = North)
     const cursors = ['n-resize', 'ne-resize', 'e-resize', 'se-resize', 's-resize', 'sw-resize', 'w-resize', 'nw-resize'];
-    
-    // Helper to get rotated cursor
     const getCursor = (baseIndex: number) => {
-        // Add element rotation to base handle direction
-        // Map 0-360 to 0-7 index
         const rotSteps = Math.round(rotation / 45);
         const index = (baseIndex + rotSteps + 8) % 8;
         return cursors[index];
     };
 
-    // Handles Definition: [x, y, baseIndex (0=N, 1=NE...), name]
     const handles = [
-        [width/2, 0, 0, 'n'],
-        [width, 0, 1, 'ne'],
-        [width, height/2, 2, 'e'],
-        [width, height, 3, 'se'],
-        [width/2, height, 4, 's'],
-        [0, height, 5, 'sw'],
-        [0, height/2, 6, 'w'],
-        [0, 0, 7, 'nw']
+        [width/2, 0, 0, 'n'], [width, 0, 1, 'ne'], [width, height/2, 2, 'e'], [width, height, 3, 'se'],
+        [width/2, height, 4, 's'], [0, height, 5, 'sw'], [0, height/2, 6, 'w'], [0, 0, 7, 'nw']
     ] as const;
 
     return (
         <g>
-            {/* Bounding Box Outline */}
             <rect x={0} y={0} width={width} height={height} fill="none" stroke="#3b82f6" strokeWidth={1/scale} strokeDasharray={`${4/scale},${4/scale}`} pointerEvents="none"/>
-            
             {handles.map(([x, y, baseIdx, name]) => (
                 <rect 
                     key={name}
@@ -99,10 +84,7 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, rotation, 
                     stroke="#3b82f6"
                     strokeWidth={1.5/scale}
                     style={{ cursor: getCursor(baseIdx) }}
-                    onMouseDown={(e) => {
-                        e.stopPropagation();
-                        onResizeStart(e, name);
-                    }}
+                    onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, name); }}
                 />
             ))}
         </g>
@@ -120,7 +102,8 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
   return (
       <svg
           ref={svgRef}
-          className="w-full h-full bg-white cursor-grab active:cursor-grabbing touch-none"
+          className="w-full h-full bg-white touch-none"
+          style={{ cursor: 'default' }}
           onMouseDown={(e) => onMouseDown(e)}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
@@ -134,6 +117,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                   </clipPath>
               ))}
             
+            {/* Pattern Definitions */}
             <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                <line x1="0" y1="0" x2="0" y2="10" stroke="#ccc" strokeWidth="1" />
             </pattern>
@@ -148,6 +132,14 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
             <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
               <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#f5f5f5" strokeWidth="1"/>
             </pattern>
+            <pattern id="grass" width="20" height="20" patternUnits="userSpaceOnUse">
+               <path d="M 2 10 L 5 2 L 8 10 M 12 15 L 15 7 L 18 15" stroke="#86efac" fill="none" strokeWidth="1" />
+               <rect width="20" height="20" fill="#dcfce7" fillOpacity="0.5" />
+            </pattern>
+            <pattern id="parking" width="40" height="40" patternUnits="userSpaceOnUse">
+               <rect width="40" height="40" fill="#f3f4f6" />
+               <path d="M 0 40 L 40 0" stroke="#d1d5db" strokeWidth="2" />
+            </pattern>
           </defs>
 
           <g transform={`translate(${pan.x}, ${pan.y}) rotate(${rotation}) scale(${scale})`}>
@@ -157,38 +149,60 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
             {visibleRooms.map((room) => {
                const isWetArea = ['bathroom', 'kitchen', 'balcony'].includes(room.type);
                const isLiving = ['living', 'bedroom', 'dining'].includes(room.type);
+               const isGarden = room.type === 'garden';
+               const isParking = room.type === 'parking';
+               const isBalcony = room.type === 'balcony' || room.type === 'terrace';
+
                const isSelected = room.id === selectedId;
-               const defaultFill = isWetArea ? "url(#tiles)" : isLiving ? "url(#wood)" : "none";
+               
+               // Determine Fill
+               let fill = "none";
+               if (room.color) fill = room.color;
+               else if (isGarden) fill = "url(#grass)";
+               else if (isParking) fill = "url(#parking)";
+               else if (isBalcony) fill = "url(#tiles)";
+               else if (isWetArea) fill = "url(#tiles)";
+               else if (isLiving) fill = "url(#wood)";
+
+               // Determine Stroke (Walls)
+               const strokeColor = isSelected ? "#3b82f6" : (isGarden || isParking ? "#888" : "black");
+               const strokeWidth = isGarden || isParking ? 2 : WALL_STROKE_WIDTH;
                
                return (
                 <g
                   key={room.id}
                   transform={`translate(${room.x}, ${room.y})`}
-                  onMouseDown={(e) => onMouseDown(e, room.id, 'room', room.x, room.y)}
-                  className="cursor-move group"
+                  onMouseDown={(e) => { e.preventDefault(); onMouseDown(e, room.id, 'room', room.x, room.y); }}
+                  style={{ cursor: isSelected ? "move" : "pointer" }}
+                  className="group"
                 >
                   <rect
                     width={room.width}
                     height={room.height}
-                    fill="white" 
-                    stroke={isSelected ? "#3b82f6" : "black"}
-                    strokeWidth={WALL_STROKE_WIDTH}
+                    fill={isGarden ? "#f0fdf4" : "white"} 
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={isGarden ? "5,5" : "none"}
                     className={isSelected ? "shadow-lg" : "shadow-sm"}
                   />
+                  {/* Internal Fill Pattern */}
                   <rect 
-                     x={WALL_STROKE_WIDTH/2} y={WALL_STROKE_WIDTH/2}
-                     width={room.width - WALL_STROKE_WIDTH}
-                     height={room.height - WALL_STROKE_WIDTH}
-                     fill={room.color || defaultFill}
+                     x={strokeWidth/2} y={strokeWidth/2}
+                     width={room.width - strokeWidth}
+                     height={room.height - strokeWidth}
+                     fill={fill}
                      opacity={room.opacity ?? 1}
                      pointerEvents="none"
                   />
-                  <text x={room.width/2} y={room.height/2} textAnchor="middle" className="font-mono text-sm font-bold fill-black pointer-events-none select-none tracking-widest">
+                  
+                  {/* Text Label */}
+                  <text x={room.width/2} y={room.height/2} textAnchor="middle" className={`font-mono text-sm font-bold pointer-events-none select-none tracking-widest ${isGarden ? 'fill-green-700' : 'fill-black'}`}>
                     {room.name.toUpperCase()}
                   </text>
                   <text x={room.width/2} y={room.height/2 + 15} textAnchor="middle" className="font-mono text-[10px] fill-gray-500 pointer-events-none select-none">
                     {Math.round((room.width * room.height) / 10000)}m²
                   </text>
+                  
                   {isSelected && (
                     <ResizeHandles 
                         width={room.width} 
@@ -230,8 +244,9 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                   <g 
                     key={el.id} 
                     transform={`translate(${el.x}, ${el.y}) rotate(${el.rotation}, ${el.width/2}, ${el.height/2})`}
-                    onMouseDown={(e) => onMouseDown(e, el.id, 'element', el.x, el.y)}
-                    className="cursor-move hover:opacity-80"
+                    onMouseDown={(e) => { e.preventDefault(); onMouseDown(e, el.id, 'element', el.x, el.y); }}
+                    style={{ cursor: isSelected ? "move" : "pointer" }}
+                    className="hover:opacity-80"
                     {...clipProp}
                   >
                       {render2DShape()}
