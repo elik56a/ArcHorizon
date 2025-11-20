@@ -6,7 +6,7 @@ import {
   Settings2, Trash2, Box, LayoutGrid,
   DoorOpen, Maximize2, BedDouble, Bed, Sofa, 
   Utensils, Monitor, Archive, Bath, ShowerHead, 
-  Waves, Flame, Move, Trees
+  Waves, Flame, Move, Trees, Palette, Car, Armchair
 } from 'lucide-react';
 
 const RightSidePanel: React.FC = () => {
@@ -37,8 +37,50 @@ const RightSidePanel: React.FC = () => {
                  <input type="text" value={(item as any).name || ''} onChange={(e) => updateItem(item.id, selection.type, 'name', e.target.value)} className={THEME.input} placeholder="Room Name" />
               )}
               {selection.type === 'element' && (
-                  <div className="text-sm text-gray-500 italic py-2">Element ID: {item.id}</div>
+                  <div className="text-sm text-gray-500 italic py-1 mb-2">ID: {item.id}</div>
               )}
+              <div className="mt-2">
+                 <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 block">Label</label>
+                 <input 
+                    type="text" 
+                    value={(item as any).label || ''} 
+                    onChange={(e) => updateItem(item.id, selection.type, 'label', e.target.value)} 
+                    className={THEME.input} 
+                    placeholder="Add visible label..." 
+                 />
+              </div>
+           </div>
+           
+           <div>
+              <label className={THEME.label}>Visual Styles</label>
+              <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <div className="flex-1">
+                      <span className="text-[10px] text-gray-500 mb-1 block font-medium">Color</span>
+                      <div className="flex gap-2 items-center">
+                          <div className="relative w-8 h-8 rounded overflow-hidden border border-gray-300 shadow-sm">
+                            <input 
+                                type="color" 
+                                value={item.color || '#ffffff'} 
+                                onChange={(e) => updateItem(item.id, selection.type, 'color', e.target.value)}
+                                className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer p-0 border-0" 
+                            />
+                          </div>
+                          <span className="text-[10px] font-mono text-gray-400 uppercase">{item.color || '#ffffff'}</span>
+                      </div>
+                  </div>
+                  <div className="flex-1">
+                       <span className="text-[10px] text-gray-500 mb-1 block font-medium">Opacity</span>
+                       <div className="flex items-center gap-2">
+                           <input 
+                             type="range" min="0.1" max="1" step="0.1" 
+                             value={item.opacity ?? 1} 
+                             onChange={(e) => updateItem(item.id, selection.type, 'opacity', Number(e.target.value))}
+                             className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black"
+                           />
+                           <span className="text-[10px] w-6 text-right font-mono text-gray-500">{Math.round((item.opacity ?? 1) * 100)}%</span>
+                       </div>
+                  </div>
+              </div>
            </div>
 
            <div>
@@ -98,18 +140,26 @@ const RightSidePanel: React.FC = () => {
   
   const getIconForType = (type: string) => {
       switch(type) {
+          case 'living': return <Armchair size={20} />;
+          case 'kitchen': return <Utensils size={20} />;
+          case 'bedroom': return <BedDouble size={20} />;
+          case 'bathroom': return <Bath size={20} />;
+          case 'dining': return <Utensils size={20} />;
+          case 'garden': return <Trees size={20} />;
+          case 'parking': return <Car size={20} />;
+          
           case 'door': return <DoorOpen size={20} />;
           case 'entry_door': return <DoorOpen size={20} strokeWidth={2.5} />;
           case 'window': return <Maximize2 size={20} />;
           case 'stairs_up': return <Move size={20} className="-rotate-45" />;
-          case 'bedroom': return <BedDouble size={20} />;
-          case 'garden': return <Trees size={20} />;
+          
           case 'bed_king': return <BedDouble size={20} />;
           case 'bed_single': return <Bed size={20} />;
           case 'sofa': return <Sofa size={20} />;
           case 'dining_table': return <Utensils size={20} />;
           case 'desk': return <Monitor size={20} />;
           case 'wardrobe': return <Archive size={20} />;
+          
           case 'toilet': return <Bath size={20} className="scale-75" />;
           case 'sink': return <Waves size={20} />;
           case 'bathtub': return <Bath size={20} />;
@@ -119,8 +169,10 @@ const RightSidePanel: React.FC = () => {
       }
   };
 
+  const structuralZones = ['living', 'kitchen', 'bedroom', 'bathroom', 'dining', 'garden', 'parking'];
+
   const libraryCategories = {
-     'Structure': ['bedroom', 'garden', 'door', 'window', 'entry_door', 'stairs_up'],
+     'Openings': ['door', 'window', 'entry_door', 'stairs_up'],
      'Furniture': ['bed_king', 'bed_single', 'sofa', 'dining_table', 'desk', 'wardrobe'],
      'Utilities': ['toilet', 'sink', 'bathtub', 'shower', 'stove']
   };
@@ -136,14 +188,39 @@ const RightSidePanel: React.FC = () => {
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-8">
+          
+          {/* Top Section: Structural Zones */}
+          <div>
+             <h3 className="text-[11px] font-bold uppercase text-gray-800 bg-gray-100 py-1.5 px-2 rounded mb-3 tracking-wider flex items-center gap-2 border border-gray-200">
+                <Box size={12} className="text-blue-600"/> Structural Zones
+             </h3>
+             <div className="grid grid-cols-2 gap-2">
+                {structuralZones.map((t) => (
+                    <button 
+                        key={t}
+                        onClick={() => addItem(t as any, 'room')}
+                        className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200 hover:border-black hover:bg-gray-50 transition-all group bg-white text-left"
+                    >
+                         <div className="text-gray-400 group-hover:text-black transition-colors">
+                            {getIconForType(t)}
+                         </div>
+                         <span className="text-xs font-bold text-gray-700 group-hover:text-black capitalize">
+                            {t}
+                         </span>
+                    </button>
+                ))}
+             </div>
+          </div>
+
+          {/* Other Categories */}
           {Object.entries(libraryCategories).map(([cat, types]) => (
              <div key={cat}>
-                <h3 className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 px-1">{cat}</h3>
+                <h3 className="text-[11px] font-bold uppercase text-gray-400 tracking-wider mb-3 px-1 border-b border-gray-100 pb-1">{cat}</h3>
                 <div className="grid grid-cols-3 gap-2">
                    {types.map((t) => (
                       <button 
                         key={t}
-                        onClick={() => addItem(t as any, t === 'bedroom' || t === 'garden' ? 'room' : 'element')}
+                        onClick={() => addItem(t as any, 'element')}
                         className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 hover:shadow-md transition-all group bg-white aspect-square"
                         title={`Add ${t.replace('_', ' ')}`}
                       >

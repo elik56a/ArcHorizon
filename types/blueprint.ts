@@ -18,6 +18,7 @@ export interface Room {
   floorFinish?: FloorFinish;
   color?: string;
   opacity?: number;
+  label?: string;
 }
 
 export interface Connection {
@@ -44,4 +45,5 @@ export interface ArchitecturalElement {
   floor: number;
   color?: string;
   opacity?: number;
+  label?: string;
 }

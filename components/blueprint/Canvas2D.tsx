@@ -202,6 +202,11 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                   <text x={room.width/2} y={room.height/2 + 15} textAnchor="middle" className="font-mono text-[10px] fill-gray-500 pointer-events-none select-none">
                     {Math.round((room.width * room.height) / 10000)}m²
                   </text>
+                  {room.label && (
+                     <text x={room.width/2} y={room.height/2 + 30} textAnchor="middle" className="font-mono text-[10px] fill-blue-600 font-bold pointer-events-none select-none tracking-tight">
+                        {room.label.toUpperCase()}
+                     </text>
+                  )}
                   
                   {isSelected && (
                     <ResizeHandles 
@@ -250,6 +255,18 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     {...clipProp}
                   >
                       {render2DShape()}
+                      {el.label && (
+                         <text 
+                            x={el.width/2} 
+                            y={el.height/2} 
+                            textAnchor="middle" 
+                            dominantBaseline="middle"
+                            className="font-mono text-[9px] fill-gray-500 font-bold pointer-events-none select-none"
+                            transform={`rotate(${-el.rotation}, ${el.width/2}, ${el.height/2})`}
+                         >
+                            {el.label}
+                         </text>
+                      )}
                       {isSelected && (
                         <ResizeHandles 
                             width={el.width} 
