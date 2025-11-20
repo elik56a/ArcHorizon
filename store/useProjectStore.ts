@@ -1,8 +1,8 @@
-
 import { create } from 'zustand';
 import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room, UnitSystem } from '../types';
 import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from '../services/geminiService';
 import { MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY } from '../dev/mockData';
+import { getLibraryItem } from '../config/libraryConfig';
 
 interface ProjectState {
   // Data State
@@ -300,18 +300,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           rooms: [...currentData.rooms],
           elements: [...currentData.elements]
       };
+      
+      const config = getLibraryItem(type);
+      const width = config ? config.defaultWidth : 100;
+      const height = config ? config.defaultHeight : 100;
+      const label = config ? config.label : 'New Item';
+
       const center = { x: 500, y: 500 }; 
       let newSelection: Selection | null = null;
+      
       if (category === 'room') {
           const newRoom: Room = {
               id: `room-${Date.now()}`,
-              name: 'New Room',
+              name: label,
               type: type as RoomType,
               floor: 1,
               x: center.x,
               y: center.y,
-              width: 300,
-              height: 300,
+              width: width,
+              height: height,
               floorFinish: 'wood'
           };
           newData.rooms.push(newRoom);
@@ -324,13 +331,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               floor: 1,
               x: center.x + 50,
               y: center.y + 50,
-              width: 100,
-              height: 100,
-              rotation: 0
+              width: width,
+              height: height,
+              rotation: 0,
+              label: label
           };
-          if (type.toString().includes('door')) { newEl.width = 90; newEl.height = 15; }
-          if (type === 'bed_king') { newEl.width = 180; newEl.height = 200; }
-          if (type === 'toilet') { newEl.width = 50; newEl.height = 70; }
           newData.elements.push(newEl);
           newSelection = { id: newEl.id, type: 'element' };
       }
