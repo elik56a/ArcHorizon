@@ -1,9 +1,10 @@
 
 import React, { useEffect, Suspense, useRef, useState } from 'react';
 import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Grid as Grid3D, Environment, ContactShadows, Html, Edges } from '@react-three/drei';
+import { OrbitControls, Grid as Grid3D, Environment, ContactShadows, Html } from '@react-three/drei';
 import { SketchData, Room, ArchitecturalElement } from '../../types';
 import * as THREE from 'three';
+import { Render3DElement } from './ElementRenderer'; 
 
 // Fix for TypeScript not recognizing R3F elements in JSX
 declare global {
@@ -22,33 +23,13 @@ declare global {
       [elemName: string]: any;
     }
   }
-  // Augment React.JSX for newer TS/React versions
-  namespace React {
-    namespace JSX {
-      interface IntrinsicElements {
-        group: any;
-        mesh: any;
-        boxGeometry: any;
-        planeGeometry: any;
-        meshStandardMaterial: any;
-        meshPhysicalMaterial: any;
-        meshBasicMaterial: any;
-        ambientLight: any;
-        directionalLight: any;
-        orthographicCamera: any;
-        [elemName: string]: any;
-      }
-    }
-  }
 }
 
-const WALL_HEIGHT = 280; // cm
-const WALL_THICKNESS = 15; // cm
-const OPENING_THICKNESS = 22; // cm
-const FLOOR_PITCH = 300; // cm (Height difference between floors)
+const WALL_HEIGHT = 280; 
+const WALL_THICKNESS = 25; // MATCH 2D
+const FLOOR_PITCH = 300; 
 
 // --- WALL GENERATOR ---
-// Procedurally generates a wall with holes (windows/doors)
 interface Hole {
   start: number;
   width: number;
@@ -61,71 +42,44 @@ interface WallGeneratorProps {
   height: number;
   thickness: number;
   holes: Hole[];
-  position: [number, number, number]; // Center of the wall's BASE line
+  position: [number, number, number]; 
   rotation: [number, number, number];
 }
 
 const WallGenerator: React.FC<WallGeneratorProps> = ({ length, height, thickness, holes, position, rotation }) => {
-  // Sort holes by position along the wall
   const sortedHoles = [...holes].sort((a, b) => a.start - b.start);
-  
   const segments = [];
   let cursor = 0;
 
   sortedHoles.forEach((hole, idx) => {
-      // 1. Solid wall before the hole
-      const solidLength = hole.start - cursor;
+      // Ensure hole is within bounds (Simple clamping to avoid artifacts if logic fails elsewhere)
+      const holeStart = Math.max(0, hole.start);
+      const holeEnd = Math.min(length, hole.start + hole.width);
+      const holeW = holeEnd - holeStart;
+      
+      if (holeW <= 0) return;
+
+      const solidLength = holeStart - cursor;
       if (solidLength > 1) {
-          segments.push({
-              type: 'solid',
-              width: solidLength,
-              height: height,
-              x: cursor + solidLength / 2,
-              y: height / 2
-          });
+          segments.push({ type: 'solid', width: solidLength, height: height, x: cursor + solidLength / 2, y: height / 2 });
       }
-
-      // 2. Wall BELOW the hole (Sill)
       if (hole.bottom > 1) {
-          segments.push({
-              type: 'sill',
-              width: hole.width,
-              height: hole.bottom,
-              x: hole.start + hole.width / 2,
-              y: hole.bottom / 2
-          });
+          segments.push({ type: 'sill', width: holeW, height: hole.bottom, x: holeStart + holeW / 2, y: hole.bottom / 2 });
       }
-
-      // 3. Wall ABOVE the hole (Header)
       const headerHeight = height - (hole.bottom + hole.height);
       if (headerHeight > 1) {
-          segments.push({
-              type: 'header',
-              width: hole.width,
-              height: headerHeight,
-              x: hole.start + hole.width / 2,
-              y: height - headerHeight / 2
-          });
+          segments.push({ type: 'header', width: holeW, height: headerHeight, x: holeStart + holeW / 2, y: height - headerHeight / 2 });
       }
-
-      cursor = hole.start + hole.width;
+      cursor = holeEnd;
   });
 
-  // 4. Remaining solid wall after last hole
   const remaining = length - cursor;
   if (remaining > 1) {
-      segments.push({
-          type: 'solid',
-          width: remaining,
-          height: height,
-          x: cursor + remaining / 2,
-          y: height / 2
-      });
+      segments.push({ type: 'solid', width: remaining, height: height, x: cursor + remaining / 2, y: height / 2 });
   }
 
   return (
       <group position={position} rotation={rotation}>
-          {/* Offset to start from 0,0 instead of center */}
           <group position={[-length / 2, 0, 0]}>
             {segments.map((seg, i) => (
                 <mesh key={i} position={[seg.x, seg.y, 0]} castShadow receiveShadow>
@@ -138,9 +92,7 @@ const WallGenerator: React.FC<WallGeneratorProps> = ({ length, height, thickness
   );
 };
 
-
 // --- 3D COMPONENTS ---
-
 interface Element3DProps {
     element: ArchitecturalElement;
     onPointerDown: (e: ThreeEvent<PointerEvent>, id: string) => void;
@@ -149,227 +101,22 @@ interface Element3DProps {
 }
 
 const Element3D: React.FC<Element3DProps> = ({ element, onPointerDown, elementRefs, yOffset }) => {
-  const { x, y, width, height, rotation, type, color, id } = element;
+  const { x, y, width, height, rotation, id, color } = element;
   const px = x + width / 2;
   const pz = y + height / 2;
   const rotY = -rotation * (Math.PI / 180);
-
-  const materialProps = { color: color || '#ffffff', roughness: 0.5 };
-  const baseY = 30 + yOffset;
-
-  // --- LONG PRESS LOGIC ---
-  const timerRef = useRef<any>(null);
-  const startPosRef = useRef<{x: number, y: number} | null>(null);
-
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-      startPosRef.current = { x: e.clientX, y: e.clientY };
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-          onPointerDown(e, id); 
-          timerRef.current = null;
-      }, 500);
-  };
-
-  const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
-      if (timerRef.current) {
-          clearTimeout(timerRef.current);
-          timerRef.current = null;
-      }
-  };
-
-  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-      if (timerRef.current && startPosRef.current) {
-          const dx = Math.abs(e.clientX - startPosRef.current.x);
-          const dy = Math.abs(e.clientY - startPosRef.current.y);
-          if (dx > 5 || dy > 5) {
-              clearTimeout(timerRef.current);
-              timerRef.current = null;
-          }
-      }
-  };
+  const baseY = 0 + yOffset; 
 
   const setRef = (el: any) => { if (el) elementRefs.current[id] = el; };
-
-  const renderContent = () => {
-      switch (type) {
-        case 'bed_king':
-        case 'bed_single':
-          return (
-            <group>
-              <mesh castShadow receiveShadow position={[0, 0, 0]}>
-                <boxGeometry args={[width, 40, height]} />
-                <meshStandardMaterial {...materialProps} color={color || "#f0f0f0"} />
-                <Edges color="black" threshold={15} />
-              </mesh>
-              <mesh castShadow receiveShadow position={[-width/2 + 5, 20, 0]}>
-                 <boxGeometry args={[10, 80, height]} />
-                 <meshStandardMaterial color="#ccc" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-              <mesh position={[-width/2 + 25, 25, -height/4]} rotation={[0,0,0.2]}>
-                 <boxGeometry args={[20, 10, 30]} />
-                 <meshStandardMaterial color="white" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-               <mesh position={[-width/2 + 25, 25, height/4]} rotation={[0,0,0.2]}>
-                 <boxGeometry args={[20, 10, 30]} />
-                 <meshStandardMaterial color="white" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-            </group>
-          );
-        case 'sofa':
-          return (
-            <group>
-              <mesh castShadow receiveShadow position={[0, 0, 0]}>
-                 <boxGeometry args={[width, 40, height]} />
-                 <meshStandardMaterial color={color || "#ddd"} />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-              <mesh castShadow position={[-width/2 + 10, 30, 0]}>
-                 <boxGeometry args={[20, 60, height]} />
-                 <meshStandardMaterial color="#ccc" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-               <mesh castShadow position={[0, 15, -height/2 + 10]}>
-                 <boxGeometry args={[width, 50, 20]} />
-                 <meshStandardMaterial color="#ccc" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-              <mesh castShadow position={[0, 15, height/2 - 10]}>
-                 <boxGeometry args={[width, 50, 20]} />
-                 <meshStandardMaterial color="#ccc" />
-                 <Edges color="black" threshold={15} />
-              </mesh>
-            </group>
-          );
-        case 'dining_table':
-        case 'desk':
-          return (
-             <group position={[0, 12.5, 0]}>
-                <mesh castShadow position={[0, 35, 0]}>
-                   <boxGeometry args={[width, 5, height]} />
-                   <meshStandardMaterial color={color || "#e8e8e8"} />
-                   <Edges color="black" threshold={15} />
-                </mesh>
-                <mesh position={[width/2-5, 0, height/2-5]}>
-                   <boxGeometry args={[5, 70, 5]} />
-                   <meshStandardMaterial color="#333" />
-                </mesh>
-                <mesh position={[-width/2+5, 0, height/2-5]}>
-                   <boxGeometry args={[5, 70, 5]} />
-                   <meshStandardMaterial color="#333" />
-                </mesh>
-                <mesh position={[width/2-5, 0, -height/2+5]}>
-                   <boxGeometry args={[5, 70, 5]} />
-                   <meshStandardMaterial color="#333" />
-                </mesh>
-                 <mesh position={[-width/2+5, 0, -height/2+5]}>
-                   <boxGeometry args={[5, 70, 5]} />
-                   <meshStandardMaterial color="#333" />
-                </mesh>
-             </group>
-          );
-        case 'wardrobe':
-           return (
-             <group position={[0, 70, 0]}>
-                <mesh castShadow receiveShadow>
-                   <boxGeometry args={[width, 200, height]} />
-                   <meshStandardMaterial color={color || "#f5f5f5"} />
-                   <Edges color="black" threshold={15} />
-                </mesh>
-                <mesh position={[width/2 + 1, 0, 0]}>
-                    <boxGeometry args={[1, 190, 2]} />
-                    <meshStandardMaterial color="#ddd" />
-                    <Edges color="black" threshold={15} />
-                </mesh>
-             </group>
-           );
-        case 'toilet':
-            return (
-               <group position={[0, -30, 0]}>
-                   <mesh position={[-width/2 + 10, 40, 0]}>
-                       <boxGeometry args={[20, 40, 40]} />
-                       <meshStandardMaterial color={color || "white"} />
-                       <Edges color="black" threshold={15} />
-                   </mesh>
-                   <mesh position={[0, 20, 0]}>
-                       <boxGeometry args={[30, 35, 30]} />
-                       <meshStandardMaterial color={color || "white"} />
-                       <Edges color="black" threshold={15} />
-                   </mesh>
-               </group>
-            );
-         case 'door':
-         case 'entry_door':
-            return (
-               <group position={[0, 70, 0]}>
-                   {/* Frame */}
-                   <mesh position={[0, 0, -height/2 + 2]}>
-                       <boxGeometry args={[width + 5, 200, 4]} />
-                       <meshStandardMaterial color="#333" />
-                   </mesh>
-                   <mesh position={[0, 0, height/2 - 2]}>
-                       <boxGeometry args={[width + 5, 200, 4]} />
-                       <meshStandardMaterial color="#333" />
-                   </mesh>
-                   <mesh position={[0, 98, 0]}>
-                       <boxGeometry args={[width + 5, 4, height]} />
-                       <meshStandardMaterial color="#333" />
-                   </mesh>
-                   {/* Door Panel (Open slightly) */}
-                   <mesh position={[-width/2 + 2, 0, 0]} rotation={[0, -0.5, 0]}>
-                       <boxGeometry args={[width, 200, 4]} />
-                       <meshStandardMaterial color="#555" />
-                       <Edges color="black" threshold={15} />
-                   </mesh>
-               </group>
-            );
-          case 'window':
-             return (
-                <group position={[0, 90, 0]}>
-                     <mesh position={[0, 0, 0]}>
-                        <boxGeometry args={[width + 4, 110, OPENING_THICKNESS]} />
-                        <meshStandardMaterial color="#222" />
-                     </mesh>
-                    <mesh position={[0, 0, 0]}>
-                        <boxGeometry args={[width, 100, OPENING_THICKNESS + 2]} />
-                        <meshPhysicalMaterial 
-                           color={color || "#88ccff"} 
-                           roughness={0.0} 
-                           transmission={0.6} 
-                           transparent 
-                           opacity={0.5} 
-                           thickness={2}
-                        />
-                    </mesh>
-                </group>
-             );
-        default:
-          return (
-            <mesh position={[0, -20, 0]}>
-               <boxGeometry args={[width, 20, height]} />
-               <meshStandardMaterial color={color || "#ccc"} wireframe />
-            </mesh>
-          );
-      }
-  };
 
   return (
     <group 
         ref={setRef} 
         position={[px, baseY, pz]} 
         rotation={[0, rotY, 0]} 
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerUp}
-        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, id); }}
     >
-        {renderContent()}
-        <mesh visible={false}>
-            <boxGeometry args={[width, 100, height]} />
-        </mesh>
+        <Render3DElement el={element} color={color} />
     </group>
   );
 };
@@ -384,83 +131,73 @@ const Room3D: React.FC<{ room: Room, elements: ArchitecturalElement[], yOffset: 
   const isPool = type === 'pool';
   const isBalcony = type === 'balcony' || type === 'terrace';
 
-  // --- ELEVATION LOGIC (Z-FIGHTING FIX) ---
-  // Hierarchy: Garden < Parking < Pool < Interior (Slab)
   let elevation = 0.1;
   if (isGarden) elevation = 0.1;
   else if (isParking) elevation = 0.2;
   else if (isPool) elevation = 0.3;
-  else elevation = 2.5; // Lift building slabs up
+  else elevation = 2.5; 
 
   const floorY = elevation + yOffset;
 
-  // Determine Floor Color
   let floorColor = '#f5f5f5';
   if (color) floorColor = color;
-  else if (isPool) floorColor = '#06b6d4'; // Cyan for Pool
-  else if (isGarden) floorColor = '#4ade80'; // Green
-  else if (isParking) floorColor = '#9ca3af'; // Asphalt Gray
+  else if (isPool) floorColor = '#06b6d4'; 
+  else if (isGarden) floorColor = '#4ade80'; 
+  else if (isParking) floorColor = '#9ca3af'; 
   else if (floorFinish === 'wood') floorColor = '#d4a373';
   else if (floorFinish === 'tiled') floorColor = '#e0e0e0';
-  else if (floorFinish === 'concrete') floorColor = '#999';
   
   const hasWalls = !isGarden && !isParking && !isPool;
   const wallHeight = isBalcony ? 110 : WALL_HEIGHT; 
 
-  // --- HOLE DETECTION LOGIC ---
   const TOLERANCE = 20; 
-
   const getHolesForWall = (wall: 'north' | 'south' | 'west' | 'east'): Hole[] => {
       const holes: Hole[] = [];
       elements.forEach(el => {
-          if (!['window', 'door', 'entry_door', 'balcony_door'].includes(el.type)) return;
+          if (!['window', 'door', 'entry_door', 'balcony_door', 'wall_opening'].includes(el.type)) return;
           
           let isOnWall = false;
           let start = 0;
           let holeWidth = 0;
-          const isHorizontal = Math.abs(el.rotation) < 45 || Math.abs(el.rotation - 180) < 45;
           
+          // FIX: For windows/doors/openings, 'width' is always the linear span, 'height' is thickness.
+          const linearSpan = el.width;
+
           let bottom = 0;
           let holeHeight = 210; 
           if (el.type === 'window') {
-              bottom = 90; 
+              bottom = 110; // Sill height for window
               holeHeight = 110;
-          } else {
-              bottom = 0;
+          } else if (el.type === 'entry_door') {
+              holeHeight = 230;
+          } else if (el.type === 'wall_opening') {
+              holeHeight = WALL_HEIGHT - 30; // Nearly full height, leave beam
           }
 
           if (wall === 'north') { 
-             if (Math.abs(el.y - y) < TOLERANCE) {
-                 isOnWall = true;
-                 start = el.x - x;
-                 holeWidth = isHorizontal ? el.width : el.height; 
-             }
+             if (Math.abs(el.y - y) < TOLERANCE) { isOnWall = true; start = el.x - x; holeWidth = linearSpan; }
           } else if (wall === 'south') { 
-             if (Math.abs((el.y) - (y + height)) < TOLERANCE || Math.abs((el.y + el.height) - (y + height)) < TOLERANCE) {
-                 if (Math.abs(el.y - (y+height)) < TOLERANCE) {
-                    isOnWall = true;
-                    start = el.x - x;
-                    holeWidth = isHorizontal ? el.width : el.height;
-                 }
+             if (Math.abs(el.y - (y+height)) < TOLERANCE || Math.abs((el.y + el.height) - (y + height)) < TOLERANCE) { 
+                 isOnWall = true; start = el.x - x; holeWidth = linearSpan; 
              }
           } else if (wall === 'west') { 
-             if (Math.abs(el.x - x) < TOLERANCE) {
-                 isOnWall = true;
-                 start = el.y - y;
-                 holeWidth = isHorizontal ? el.height : el.width;
-             }
+             if (Math.abs(el.x - x) < TOLERANCE) { isOnWall = true; start = el.y - y; holeWidth = linearSpan; }
           } else if (wall === 'east') { 
-             if (Math.abs((el.x) - (x + width)) < TOLERANCE || Math.abs((el.x + el.width) - (x + width)) < TOLERANCE) {
-                 if (Math.abs(el.x - (x+width)) < TOLERANCE) {
-                    isOnWall = true;
-                    start = el.y - y;
-                    holeWidth = isHorizontal ? el.height : el.width;
-                 }
+             if (Math.abs(el.x - (x+width)) < TOLERANCE || Math.abs((el.x + el.width) - (x + width)) < TOLERANCE) { 
+                 isOnWall = true; start = el.y - y; holeWidth = linearSpan; 
              }
           }
 
           if (isOnWall) {
-              holes.push({ start, width: holeWidth, bottom, height: holeHeight });
+              // CRITICAL FIX: BOUNDS CHECK
+              // Only add hole if it actually lies within this specific wall segment.
+              // Otherwise, it's a ghost hole from an adjacent/distant wall on the same axis.
+              const wallLength = (wall === 'north' || wall === 'south') ? width + WALL_THICKNESS : height + WALL_THICKNESS;
+              
+              // Allow generous tolerance for corners (50cm), but reject far outliers
+              if (start > -50 && (start + holeWidth) < wallLength + 50) {
+                  holes.push({ start, width: holeWidth, bottom, height: holeHeight });
+              }
           }
       });
       return holes;
@@ -468,51 +205,17 @@ const Room3D: React.FC<{ room: Room, elements: ArchitecturalElement[], yOffset: 
 
   return (
     <group>
-       {/* Floor Plane */}
        <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[px, floorY, pz]}>
           <planeGeometry args={[width, height]} />
-          <meshStandardMaterial 
-             color={floorColor} 
-             roughness={isPool ? 0.1 : (isGarden ? 1 : 0.5)} 
-             metalness={isPool ? 0.5 : 0}
-          />
+          <meshStandardMaterial color={floorColor} roughness={isPool ? 0.1 : (isGarden ? 1 : 0.5)} metalness={isPool ? 0.5 : 0} />
        </mesh>
 
-       {/* Walls with Cutouts */}
        {hasWalls && (
            <group position={[0, yOffset, 0]}>
-               <WallGenerator 
-                  length={width + WALL_THICKNESS} 
-                  height={wallHeight} 
-                  thickness={WALL_THICKNESS}
-                  holes={getHolesForWall('north')}
-                  position={[px, 0, y]} 
-                  rotation={[0, 0, 0]}
-               />
-               <WallGenerator 
-                  length={width + WALL_THICKNESS} 
-                  height={wallHeight} 
-                  thickness={WALL_THICKNESS}
-                  holes={getHolesForWall('south')}
-                  position={[px, 0, y + height]} 
-                  rotation={[0, 0, 0]}
-               />
-               <WallGenerator 
-                  length={height - WALL_THICKNESS} 
-                  height={wallHeight} 
-                  thickness={WALL_THICKNESS}
-                  holes={getHolesForWall('west')}
-                  position={[x, 0, pz]} 
-                  rotation={[0, Math.PI / 2, 0]}
-               />
-               <WallGenerator 
-                  length={height - WALL_THICKNESS} 
-                  height={wallHeight} 
-                  thickness={WALL_THICKNESS}
-                  holes={getHolesForWall('east')}
-                  position={[x + width, 0, pz]} 
-                  rotation={[0, Math.PI / 2, 0]}
-               />
+               <WallGenerator length={width + WALL_THICKNESS} height={wallHeight} thickness={WALL_THICKNESS} holes={getHolesForWall('north')} position={[px, 0, y]} rotation={[0, 0, 0]} />
+               <WallGenerator length={width + WALL_THICKNESS} height={wallHeight} thickness={WALL_THICKNESS} holes={getHolesForWall('south')} position={[px, 0, y + height]} rotation={[0, 0, 0]} />
+               <WallGenerator length={height - WALL_THICKNESS} height={wallHeight} thickness={WALL_THICKNESS} holes={getHolesForWall('west')} position={[x, 0, pz]} rotation={[0, Math.PI / 2, 0]} />
+               <WallGenerator length={height - WALL_THICKNESS} height={wallHeight} thickness={WALL_THICKNESS} holes={getHolesForWall('east')} position={[x + width, 0, pz]} rotation={[0, Math.PI / 2, 0]} />
            </group>
        )}
     </group>
@@ -521,7 +224,7 @@ const Room3D: React.FC<{ room: Room, elements: ArchitecturalElement[], yOffset: 
 
 interface SceneSetupProps { 
     data: SketchData; 
-    activeFloor: number;
+    activeFloor: number; 
     showAllFloors: boolean;
     cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
 }
@@ -532,225 +235,62 @@ const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneS
   const lastProjectRef = useRef<string | null>(null);
 
   useEffect(() => {
-      return () => {
-          if (controls && camera && cameraStateRef) {
-             // @ts-ignore
-             cameraStateRef.current = { position: camera.position.clone(), target: controls.target.clone() };
-          }
-      };
-  }, []); 
-
-  useEffect(() => {
      if (!data || data.rooms.length === 0) return;
-     const isNewProject = data.id !== lastProjectRef.current;
-
-     if (isNewProject) {
+     if (data.id !== lastProjectRef.current) {
          lastProjectRef.current = data.id;
+         const minX = Math.min(...data.rooms.map(r => r.x));
+         const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
+         const minY = Math.min(...data.rooms.map(r => r.y));
+         const maxY = Math.max(...data.rooms.map(r => r.y + r.height));
+         const width = maxX - minX;
+         const depth = maxY - minY;
+         const centerX = minX + width / 2;
+         const centerZ = minY + depth / 2;
+         const currentFloorY = (activeFloor - 1) * FLOOR_PITCH;
+         const fitOffset = Math.max(width, depth) * 1.2;
 
-         if (!cameraStateRef?.current) {
-             const minX = Math.min(...data.rooms.map(r => r.x));
-             const maxX = Math.max(...data.rooms.map(r => r.x + r.width));
-             const minY = Math.min(...data.rooms.map(r => r.y));
-             const maxY = Math.max(...data.rooms.map(r => r.y + r.height));
-
-             const width = maxX - minX;
-             const depth = maxY - minY;
-             const centerX = minX + width / 2;
-             const centerZ = minY + depth / 2;
-             
-             const currentFloorY = (activeFloor - 1) * FLOOR_PITCH;
+         camera.position.set(centerX, currentFloorY + fitOffset, centerZ + fitOffset);
+         camera.lookAt(centerX, currentFloorY, centerZ);
+         if (controls) { 
              // @ts-ignore
-             const aspectFactor = (camera.aspect < 1 ? 1/camera.aspect : 1);
-             const fitOffset = Math.max(width, depth) * 0.8 * aspectFactor;
-
-             camera.position.set(centerX, currentFloorY + fitOffset, centerZ + fitOffset);
-             camera.lookAt(centerX, currentFloorY, centerZ);
-             
-             if (controls) {
-                // @ts-ignore
-                controls.target.set(centerX, currentFloorY, centerZ);
-                // @ts-ignore
-                controls.update();
-             }
-         } else {
-             camera.position.copy(cameraStateRef.current.position);
+             controls.target.set(centerX, currentFloorY, centerZ); 
              // @ts-ignore
-             controls.target.copy(cameraStateRef.current.target);
-             // @ts-ignore
-             controls.update();
+             controls.update(); 
          }
      }
   }, [data.id]);
-
-  useEffect(() => {
-      if (!controls) return;
-      const targetHeight = (activeFloor - 1) * FLOOR_PITCH;
-      // @ts-ignore
-      const currentTargetY = controls.target.y;
-      const heightDiff = targetHeight - currentTargetY;
-      
-      if (!showAllFloors && Math.abs(heightDiff) > 1) {
-           camera.position.y += heightDiff;
-           // @ts-ignore
-           controls.target.y += heightDiff;
-           // @ts-ignore
-           controls.update();
-      }
-  }, [activeFloor, showAllFloors]);
-
   return null;
 };
 
-const DragManager: React.FC<{ 
-    onUpdate: (data: SketchData) => void, 
-    data: SketchData,
-    elementRefs: React.MutableRefObject<{[key: string]: THREE.Group}>,
-    dragState: { id: string | null, offset: THREE.Vector3 | null },
-    setDragState: React.Dispatch<React.SetStateAction<{ id: string | null, offset: THREE.Vector3 | null }>>
-}> = ({ onUpdate, data, elementRefs, dragState, setDragState }) => {
-    const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
-        if (!dragState.id) return;
-        e.stopPropagation();
-        const elGroup = elementRefs.current[dragState.id];
-        if (!elGroup) return;
-
-        let currentOffset = dragState.offset;
-        if (!currentOffset) {
-             currentOffset = e.point.clone().sub(elGroup.position);
-             currentOffset.y = 0; 
-             setDragState(prev => ({ ...prev, offset: currentOffset }));
-             return;
-        }
-        const point = e.point;
-        const newPos = point.sub(currentOffset);
-        const snappedX = Math.round(newPos.x / 10) * 10;
-        const snappedZ = Math.round(newPos.z / 10) * 10;
-        elGroup.position.x = snappedX;
-        elGroup.position.z = snappedZ;
-    };
-
-    const handlePointerUp = (e: ThreeEvent<PointerEvent>) => {
-        if (!dragState.id) return;
-        e.stopPropagation();
-        const elGroup = elementRefs.current[dragState.id];
-        if (elGroup) {
-            const finalX = elGroup.position.x;
-            const finalZ = elGroup.position.z;
-            const elConfig = data.elements.find(el => el.id === dragState.id);
-            if (elConfig) {
-                const newX = finalX - elConfig.width / 2;
-                const newY = finalZ - elConfig.height / 2;
-                const newElements = data.elements.map(el => 
-                    el.id === dragState.id ? { ...el, x: newX, y: newY } : el
-                );
-                onUpdate({ ...data, elements: newElements });
-            }
-        }
-        setDragState({ id: null, offset: null });
-    };
-
-    return (
-        <mesh 
-            rotation={[-Math.PI / 2, 0, 0]} 
-            position={[0, 0, 0]} 
-            visible={!!dragState.id} 
-            onPointerMove={handlePointerMove} 
-            onPointerUp={handlePointerUp}
-            onPointerDown={(e) => e.stopPropagation()}
-        >
-            <planeGeometry args={[100000, 100000]} />
-            <meshBasicMaterial color="red" transparent opacity={0} />
-        </mesh>
-    );
-};
-
-interface Canvas3DProps {
-    data: SketchData;
-    activeFloor: number;
-    showAllFloors?: boolean;
-    onUpdate?: (data: SketchData) => void;
-    cameraStateRef?: React.MutableRefObject<{ position: any, target: any } | null>;
-}
-
-const Canvas3D: React.FC<Canvas3DProps> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
-  const visibleRooms = showAllFloors ? data.rooms : data.rooms.filter(r => r.floor === activeFloor);
-  const visibleElements = showAllFloors ? data.elements : data.elements.filter(e => e.floor === activeFloor);
+const Canvas3D: React.FC<any> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
+  const visibleRooms = showAllFloors ? data.rooms : data.rooms.filter((r:any) => r.floor === activeFloor);
+  const visibleElements = showAllFloors ? data.elements : data.elements.filter((e:any) => e.floor === activeFloor);
   const elementRefs = useRef<{[key: string]: THREE.Group}>({});
-  const [dragState, setDragState] = useState<{id: string | null, offset: THREE.Vector3 | null}>({ id: null, offset: null });
-
-  const handleElementDown = (e: ThreeEvent<PointerEvent>, id: string) => {
-      if (!onUpdate) return;
-      setDragState({ id, offset: null });
-  };
 
   return (
     <div className="w-full h-full bg-gradient-to-b from-gray-100 to-gray-200 cursor-grab active:cursor-grabbing touch-none">
-        <Canvas 
-            shadows 
-            dpr={[1, 2]}
-            camera={{ position: [0, 800, 800], fov: 50, near: 1, far: 100000 }} 
-            gl={{ antialias: true, logarithmicDepthBuffer: true }}
-        >
-           <Suspense fallback={<Html center><div className="text-xs font-mono animate-pulse">LOADING 3D...</div></Html>}>
-               <SceneSetup 
-                    data={data} 
-                    activeFloor={activeFloor}
-                    showAllFloors={showAllFloors}
-                    cameraStateRef={cameraStateRef}
-               />
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 800, 800], fov: 50, near: 1, far: 100000 }} gl={{ antialias: true }}>
+           <Suspense fallback={<Html center>LOADING...</Html>}>
+               <SceneSetup data={data} activeFloor={activeFloor} showAllFloors={showAllFloors} cameraStateRef={cameraStateRef}/>
                <ambientLight intensity={0.8} />
-               <directionalLight position={[3000, 4000, 2000]} intensity={1} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.001}>
-                  <orthographicCamera attach="shadow-camera" args={[-5000, 5000, 5000, -5000]} near={0.1} far={20000} />
-               </directionalLight>
+               <directionalLight position={[3000, 4000, 2000]} intensity={1} castShadow />
                
                <group>
-                  {visibleRooms.map(room => (
-                    <Room3D 
-                        key={room.id} 
-                        room={room} 
-                        elements={visibleElements.filter(e => e.roomId === room.id || (e.floor === room.floor))} // Pass relevant elements
-                        yOffset={(room.floor - 1) * FLOOR_PITCH} 
-                    />
+                  {visibleRooms.map((room: any) => (
+                    <Room3D key={room.id} room={room} elements={visibleElements.filter((e:any) => e.roomId === room.id || e.floor === room.floor)} yOffset={(room.floor - 1) * FLOOR_PITCH} />
                   ))}
-                  {visibleElements.map(el => (
-                      <Element3D 
-                        key={el.id} 
-                        element={el} 
-                        onPointerDown={handleElementDown} 
-                        elementRefs={elementRefs}
-                        yOffset={(el.floor - 1) * FLOOR_PITCH}
-                      />
+                  {visibleElements.map((el: any) => (
+                      <Element3D key={el.id} element={el} onPointerDown={() => {}} elementRefs={elementRefs} yOffset={(el.floor - 1) * FLOOR_PITCH} />
                   ))}
-                  
                   <Grid3D position={[0, -1, 0]} infiniteGrid fadeDistance={50000} cellColor="#bbb" sectionColor="#999" />
                   <ContactShadows resolution={1024} scale={10000} blur={2} opacity={0.5} far={100} color="#000000" />
-                  
-                  {onUpdate && (
-                      <DragLogicWrapper 
-                        onUpdate={onUpdate} 
-                        data={data} 
-                        elementRefs={elementRefs} 
-                        dragState={dragState} 
-                        setDragState={setDragState} 
-                      />
-                  )}
                </group>
-               
-               <OrbitControls 
-                  makeDefault 
-                  minPolarAngle={0} 
-                  maxPolarAngle={Math.PI / 2.1} 
-                  enabled={!dragState.id}
-               />
+               <OrbitControls makeDefault minPolarAngle={0} maxPolarAngle={Math.PI / 2.1} />
                <Environment preset="city" />
            </Suspense>
         </Canvas>
     </div>
   );
-};
-
-const DragLogicWrapper: React.FC<any> = (props) => {
-    return <DragManager {...props} />;
 };
 
 export default Canvas3D;

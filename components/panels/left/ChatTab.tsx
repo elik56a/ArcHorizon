@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { Bot, User, Loader2, Paperclip, ArrowRight, Sparkles, PlayCircle, X } from 'lucide-react';
 import { Message, Attachment } from '../../../types';
@@ -160,7 +159,9 @@ export const ChatTab: React.FC<ChatTabProps> = ({
     const handleChatFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const newAttachments: Attachment[] = [];
-            for (const file of Array.from(e.target.files)) {
+            // Explicitly cast Array.from result to File[] to satisfy typescript
+            const files = Array.from(e.target.files) as File[];
+            for (const file of files) {
                 const url = URL.createObjectURL(file);
                 newAttachments.push({ type: 'image', url, file });
             }

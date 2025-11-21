@@ -1,7 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const NavLink = ({ to, children }: { to: string, children: React.ReactNode }) => (
+interface NavLinkProps {
+  to: string;
+  children: React.ReactNode;
+}
+
+const NavLink: React.FC<NavLinkProps> = ({ to, children }) => (
     <Link to={to} className="text-sm font-bold text-gray-500 hover:text-black transition-colors font-mono uppercase tracking-tight">
         {children}
     </Link>

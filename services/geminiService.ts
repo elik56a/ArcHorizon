@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type, FunctionDeclaration, Tool, Chat } from "@google/genai";
 import { SketchData } from '../types';
+import { optimizeDesign } from './geometryEngine';
 
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -99,6 +100,7 @@ export const createArchitectSession = (): Chat => {
             4. **IMAGES**: If the user provides images, analyze them for style cues and acknowledge them specificially.
             5. **VERIFICATION**: Before calling 'propose_design', summarize the *exact* list of rooms and floors you are about to generate and ask the user to confirm.
             6. **CONFIRMATION**: Once confirmed, call the 'propose_design' tool.
+            7. **LAYOUT STRATEGY**: Prioritize open-plan layouts. Discourage hallways unless necessary for privacy in sleeping wings.
             
             TONE: Professional, creative, encouraging, and inquisitive. Use architectural terminology but keep it accessible.
             `,
@@ -119,8 +121,10 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
       TASK: Generate a detailed construction-grade floor plan based on: "${prompt}".
       
       STRICT ADHERENCE PROTOCOL:
-      1. **NO HALLUCINATIONS**: Generate ONLY the rooms and floors explicitly requested in the prompt. Do not add extra bedrooms, bathrooms, or floors "just in case".
+      1. **NO HALLUCINATIONS**: Generate ONLY the rooms and floors explicitly requested in the prompt.
       2. **EXACT COUNT**: If the prompt says "2 bedrooms", generate exactly 2.
+      3. **ENTRY POLICY**: Do NOT generate a separate room for 'Entry' unless explicitly asked for a Foyer/Vestibule. Instead, place an 'entry_door' element on the facade of the Living Room or Corridor.
+      4. **OPEN PLAN PROTOCOL**: AVOID CORRIDORS. Connect rooms directly to a central Living Room or small Hallway. Do not create long, narrow 'corridor' rooms that isolate spaces. Maximize usable floor area.
       
       CRITICAL DESIGN STANDARDS:
       1. **REALISM**: Do not generate empty boxes. Every room must be furnished with specific CAD blocks.
@@ -133,6 +137,7 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
       - **KITCHEN**: 'kitchen_island' (if space permits), 'stove', 'fridge', 'kitchen_sink' (on counter).
       - **BATHROOM**: 'toilet' (against wall), 'sink_single' or 'sink_double', 'shower' (corner or box), 'bathtub'.
       - **DINING**: 'dining_table' (include space for chairs).
+      - **ENTRY**: 'entry_door' (Mandatory).
       
       DIMENSIONING RULES (Unit = CM):
       - External Walls: 20-30cm thickness implied.
@@ -172,7 +177,10 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
         height: Number(e.height)
     }));
     
-    return data;
+    // RUN GEOMETRY ENGINE (The "Architect" Reviewer)
+    const optimizedData = optimizeDesign(data);
+
+    return optimizedData;
   } catch (error) {
     console.error(`AI Generation Error (${style}):`, error);
     throw error;
@@ -214,12 +222,12 @@ export const generateSketchFromImage = async (base64Data: string, mimeType: stri
     if (!text) throw new Error("No response from AI");
 
     const data = JSON.parse(text) as SketchData;
-    // Sanitization for Image Gen as well
     data.floors = Number(data.floors) || 1;
     data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
     data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
     
-    return data;
+    const optimizedData = optimizeDesign(data);
+    return optimizedData;
   } catch (error) {
     console.error("AI Vision Error:", error);
     throw error;
@@ -247,12 +255,12 @@ export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchD
         if (!text) throw new Error("No response from AI");
         const data = JSON.parse(text) as SketchData;
         
-        // Sanitization for DXF Gen
         data.floors = Number(data.floors) || 1;
         data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
         data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
 
-        return data;
+        const optimizedData = optimizeDesign(data);
+        return optimizedData;
     } catch (error) {
         console.error("AI DXF Parsing Error:", error);
         throw error;

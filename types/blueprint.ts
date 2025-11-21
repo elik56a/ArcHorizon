@@ -20,6 +20,9 @@ export interface Room {
   color?: string;
   opacity?: number;
   label?: string;
+  // Dynamic Label Position (Relative to Room Origin or Absolute - implementation dependent, usually Absolute in geometry engine)
+  labelX?: number;
+  labelY?: number;
 }
 
 export interface Connection {
@@ -29,7 +32,7 @@ export interface Connection {
 }
 
 export type ElementType = 
-  | 'door' | 'window' | 'entry_door' | 'sliding_door' | 'pocket_door'
+  | 'door' | 'window' | 'entry_door' | 'sliding_door' | 'pocket_door' | 'wall_opening'
   | 'bed_king' | 'bed_queen' | 'bed_single' | 'nightstand'
   | 'sofa' | 'sofa_l_shape' | 'armchair' | 'coffee_table' | 'tv_unit'
   | 'dining_table' | 'chair'
@@ -37,7 +40,8 @@ export type ElementType =
   | 'stove' | 'fridge' | 'kitchen_island' | 'kitchen_sink'
   | 'washer' | 'dryer'
   | 'desk' | 'wardrobe' | 'bookshelf'
-  | 'stairs_up' | 'stairs_down';
+  | 'stairs_up' | 'stairs_down'
+  | 'tree' | 'car' | 'garden' | 'parking' | 'pool';
 
 export interface ArchitecturalElement {
   id: string;
