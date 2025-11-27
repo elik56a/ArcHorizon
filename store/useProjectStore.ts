@@ -1,6 +1,7 @@
+
 import { create } from 'zustand';
 import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room, UnitSystem } from '../types';
-import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle } from '../services/geminiService';
+import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle, ImageAttachment } from '../services/geminiService';
 import { MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY } from '../dev/mockData';
 import { getLibraryItem } from '../config/libraryConfig';
 
@@ -33,7 +34,7 @@ interface ProjectState {
   updateOptionStatus: (index: number, option: SketchOption) => void;
 
   // Async Actions (Business Logic)
-  generateByPrompt: (prompt: string) => Promise<void>;
+  generateByPrompt: (prompt: string, images?: ImageAttachment[]) => Promise<void>;
   generateByFile: (file: File) => Promise<void>;
   generateVariation: (index: number) => Promise<void>;
   loadMock: (type: '1-story' | '2-story' | '3-story') => void;
@@ -120,7 +121,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return { sketchOptions: newOpts };
   }),
 
-  generateByPrompt: async (prompt: string) => {
+  generateByPrompt: async (prompt: string, images: ImageAttachment[] = []) => {
     set({ 
         isGenerating: true, 
         error: null, 
@@ -136,7 +137,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     try {
         const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
-        const finalData = await generateSingleSketch(prompt, styles[0]);
+        const finalData = await generateSingleSketch(prompt, styles[0], images);
         
         set((state) => {
              const newOpts = [...state.sketchOptions];

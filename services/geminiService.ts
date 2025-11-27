@@ -8,6 +8,11 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export type DesignStyle = 'Modern' | 'Rustic' | 'Creative';
 
+export interface ImageAttachment {
+  mimeType: string;
+  data: string;
+}
+
 // --- SCHEMA DEFINITIONS ---
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -112,13 +117,12 @@ export const createArchitectSession = (): Chat => {
 
 // --- GENERATION FUNCTIONS ---
 
-export const generateSingleSketch = async (prompt: string, style: DesignStyle): Promise<SketchData> => {
+export const generateSingleSketch = async (prompt: string, style: DesignStyle, images: ImageAttachment[] = []): Promise<SketchData> => {
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `
+    const textPrompt = `
       ROLE: Senior Architectural CAD Technician.
       TASK: Generate a detailed construction-grade floor plan based on: "${prompt}".
+      CONTEXT: If images are provided, use them as reference for visual style, layout arrangement, or site constraints.
       
       STRICT ADHERENCE PROTOCOL:
       1. **NO HALLUCINATIONS**: Generate ONLY the rooms and floors explicitly requested in the prompt.
@@ -146,7 +150,16 @@ export const generateSingleSketch = async (prompt: string, style: DesignStyle): 
       - Windows: Align with furniture layouts (e.g., not behind a tall wardrobe).
       
       OUTPUT FORMAT: Pure JSON matching the schema.
-      `,
+    `;
+
+    const parts: any[] = [{ text: textPrompt }];
+    images.forEach(img => {
+        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts },
       config: {
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA

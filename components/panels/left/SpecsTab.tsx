@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { getGroupedLibraryItems, LibraryItem } from '../../../config/libraryConfig';
 import { THEME } from '../../../theme';
 import { useProjectStore } from '../../../store/useProjectStore';
-import { Ruler, Sparkles, ChevronUp, ChevronDown, Send, Loader2, Plus, Minus } from 'lucide-react';
+import { Ruler, Sparkles, ChevronUp, ChevronDown, Send, Loader2, Plus, Minus, Image as ImageIcon, X } from 'lucide-react';
 
 export const SpecsTab: React.FC = () => {
     const { isGenerating, generateByPrompt, unitSystem, setUnitSystem } = useProjectStore();
@@ -14,6 +14,10 @@ export const SpecsTab: React.FC = () => {
     const [floors, setFloors] = useState(1);
     const [designStyle, setDesignStyle] = useState('Modern');
     const [customNotes, setCustomNotes] = useState('');
+    
+    // File Upload State
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Dynamic Item Quantities
     // Store counts for every possible item in the library (keyed by item type)
@@ -27,7 +31,8 @@ export const SpecsTab: React.FC = () => {
         'Zones': true,
         'Openings': false,
         'Furniture': false,
-        'Wet Areas': false
+        'Wet Areas': false,
+        'Attachments': true
     });
 
     const isImperial = unitSystem === 'imperial';
@@ -48,7 +53,17 @@ export const SpecsTab: React.FC = () => {
         });
     };
 
-    const handleGenerate = (e: React.FormEvent) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files)]);
+        }
+    };
+
+    const removeFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
         
         // Build the Prompt
@@ -74,7 +89,19 @@ export const SpecsTab: React.FC = () => {
             prompt += `\nNotes: ${customNotes}`;
         }
 
-        generateByPrompt(prompt);
+        // Process Images
+        const images = await Promise.all(selectedFiles.map(async (file) => {
+            return new Promise<{mimeType: string, data: string}>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                     const base64 = (reader.result as string).split(',')[1];
+                     resolve({ mimeType: file.type, data: base64 });
+                };
+                reader.readAsDataURL(file);
+            });
+        }));
+
+        generateByPrompt(prompt, images);
     };
 
     const renderCategory = (category: string, items: LibraryItem[]) => {
@@ -184,6 +211,67 @@ export const SpecsTab: React.FC = () => {
                          </div>
                      )}
                 </div>
+
+                {/* Reference Images Upload */}
+                <div className={THEME.card}>
+                    <div onClick={() => toggleSection('Attachments')} className={THEME.sectionHeader}>
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase text-gray-600"><ImageIcon size={14}/> Reference Images</div>
+                        {openSections['Attachments'] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                    </div>
+                    {openSections['Attachments'] && (
+                        <div className="p-3">
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                multiple 
+                                accept="image/*" 
+                                onChange={handleFileSelect} 
+                            />
+                            
+                            {selectedFiles.length === 0 ? (
+                                <div 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="border-2 border-dashed border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                >
+                                    <ImageIcon className="text-gray-300 mb-2" size={24} />
+                                    <p className="text-xs font-bold text-gray-600">Upload Reference Photos</p>
+                                    <p className="text-[10px] text-gray-400">JPG, PNG (Max 5MB)</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedFiles.map((file, idx) => (
+                                            <div key={idx} className="relative group w-16 h-16 rounded-md overflow-hidden border border-gray-200">
+                                                <img 
+                                                    src={URL.createObjectURL(file)} 
+                                                    alt="preview" 
+                                                    className="w-full h-full object-cover" 
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => removeFile(idx)}
+                                                    className="absolute top-0.5 right-0.5 bg-black/60 text-white p-0.5 rounded-full hover:bg-red-500 transition-colors"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button 
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-16 h-16 rounded-md border-2 border-dashed border-gray-200 flex items-center justify-center hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                        >
+                                            <Plus size={16} className="text-gray-400" />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 italic text-right">{selectedFiles.length} file(s) selected</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
             </div>
 
             <div className="p-4 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">

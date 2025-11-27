@@ -1,13 +1,12 @@
 
 import React, { useState, useRef } from 'react';
 import { Message, Attachment } from '../types';
-import { MessageSquare, ClipboardList, UploadCloud } from 'lucide-react';
+import { MessageSquare, ClipboardList } from 'lucide-react';
 import { Chat } from '@google/genai';
 import { ChatTab } from './panels/left/ChatTab';
 import { SpecsTab } from './panels/left/SpecsTab';
-import { ImportTab } from './panels/left/ImportTab';
 
-type InputMode = 'chat' | 'form' | 'upload';
+type InputMode = 'chat' | 'form';
 
 const ChatSidebar: React.FC = () => {
   const [mode, setMode] = useState<InputMode>('chat');
@@ -33,7 +32,6 @@ const ChatSidebar: React.FC = () => {
          {[
            { id: 'chat', icon: MessageSquare, label: 'Consult' },
            { id: 'form', icon: ClipboardList, label: 'Specs' },
-           { id: 'upload', icon: UploadCloud, label: 'Import' }
          ].map((tab) => (
             <button 
               key={tab.id}
@@ -65,7 +63,6 @@ const ChatSidebar: React.FC = () => {
              />
          )}
          {mode === 'form' && <SpecsTab />}
-         {mode === 'upload' && <ImportTab />}
       </div>
     </div>
   );
