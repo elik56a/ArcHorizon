@@ -28,6 +28,10 @@ export default {
         'fade-in': 'fadeIn 0.5s ease-out',
         'slide-up': 'slideUp 0.5s ease-out',
         'progress': 'progress 2s infinite linear',
+        'draw': 'draw 1.5s ease-out forwards',
+        'pop-in': 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+        'wash-in': 'washIn 1s ease-out forwards',
+        'stamp-in': 'stampIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
       },
       keyframes: {
         fadeIn: {
@@ -41,6 +45,22 @@ export default {
         progress: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' }
+        },
+        draw: {
+          '0%': { strokeDasharray: '0, 5000', opacity: '1' },
+          '100%': { strokeDasharray: '5000, 0', opacity: '1' }
+        },
+        popIn: {
+          '0%': { transform: 'scale(0)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' }
+        },
+        washIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
+        },
+        stampIn: {
+          '0%': { transform: 'scale(1.2)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' }
         }
       }
     },

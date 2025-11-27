@@ -12,11 +12,41 @@ export const optimizeFurniturePlacement = (data: SketchData) => {
             const box = getAbsoluteBounds(el);
             obstacles.push({ ...box, type: el.type });
             validElements.push(el);
-            if (el.type.includes('door')) {
-                const cx = box.x + box.w/2;
-                const cy = box.y + box.h/2;
-                const swingRadius = 100; 
-                obstacles.push({ x: cx - swingRadius, y: cy - swingRadius, w: swingRadius*2, h: swingRadius*2, type: 'door_swing' });
+            
+            if (el.type.includes('door') && !el.type.includes('sliding')) {
+                // Better Swing Obstacle
+                // Get Room Center to determine 'inward' direction
+                const room = data.rooms.find(r => r.id === el.roomId);
+                if (room) {
+                     const dc = { x: box.x + box.w/2, y: box.y + box.h/2 };
+                     const rc = { x: room.x + room.width/2, y: room.y + room.height/2 };
+                     
+                     // Vector from door center to room center (Inward)
+                     const dx = rc.x - dc.x;
+                     const dy = rc.y - dc.y;
+                     const len = Math.hypot(dx, dy);
+                     
+                     const nx = len > 1 ? dx/len : 0;
+                     const ny = len > 1 ? dy/len : 0;
+                     
+                     // Swing size is the width of the door
+                     const swingSize = Math.max(el.width, el.height); 
+                     
+                     // Place obstacle circle/box strictly offset into the room
+                     // Offset distance should push the center of the obstacle away from the wall
+                     // For a 90 degree swing, the obstacle needs to cover the quadrant.
+                     // A box of size swingSize*swingSize placed inward is a safe approximation.
+                     
+                     const shift = swingSize / 2 + 10;
+                     
+                     obstacles.push({ 
+                        x: dc.x + (nx * shift) - swingSize/2, 
+                        y: dc.y + (ny * shift) - swingSize/2, 
+                        w: swingSize, 
+                        h: swingSize, 
+                        type: 'door_swing' 
+                     });
+                }
             }
         }
     });

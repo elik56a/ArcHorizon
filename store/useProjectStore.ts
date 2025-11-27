@@ -1,7 +1,8 @@
 
+
 import { create } from 'zustand';
-import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room, UnitSystem } from '../types';
-import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, DesignStyle, ImageAttachment } from '../services/geminiService';
+import { SketchOption, SketchData, Selection, RoomType, ElementType, ArchitecturalElement, Room, UnitSystem, ViewStyle, RenderImage, DrawingPath } from '../types';
+import { generateSingleSketch, generateSketchFromImage, generateSketchFromDXF, generateRealisticRender, DesignStyle, ImageAttachment } from '../services/geminiService';
 import { MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY } from '../dev/mockData';
 import { getLibraryItem } from '../config/libraryConfig';
 
@@ -15,34 +16,55 @@ interface ProjectState {
   // Saved Projects (Database Mock)
   savedSketches: SketchData[];
   
+  // Renders Gallery
+  renders: RenderImage[];
+  
   // Selection
   selection: Selection | null;
 
   // Global Settings
   unitSystem: UnitSystem;
+  viewStyle: ViewStyle;
 
   // Async Status
   isGenerating: boolean;
+  isRendering: boolean;
+  currentRenderUrl: string | null;
   error: string | null;
   lastPrompt: string;
+  
+  // Render Trigger (Remote Control for Canvas)
+  renderTrigger: number;
 
   // Actions
   setSelection: (selection: Selection | null) => void;
   setCurrentOptionIndex: (index: number) => void;
   setUnitSystem: (system: UnitSystem) => void;
+  setViewStyle: (style: ViewStyle) => void;
+  setIsRendering: (isRendering: boolean) => void;
   failGeneration: (error: string) => void;
   updateOptionStatus: (index: number, option: SketchOption) => void;
+  clearRender: () => void;
+  addRender: (url: string) => void;
+  deleteRender: (id: string) => void;
+  triggerCanvasRender: () => void;
 
   // Async Actions (Business Logic)
   generateByPrompt: (prompt: string, images?: ImageAttachment[]) => Promise<void>;
   generateByFile: (file: File) => Promise<void>;
   generateVariation: (index: number) => Promise<void>;
+  generateRender: (blueprintImage: string) => Promise<void>;
   loadMock: (type: '1-story' | '2-story' | '3-story') => void;
 
   // CRUD Actions (With History)
   updateItem: (id: string, type: 'room' | 'element', field: string, value: any) => void;
   deleteItem: (id: string, type: 'room' | 'element') => void;
   addItem: (type: ElementType | RoomType, category: 'room' | 'element') => void;
+  updateSketchMetadata: (field: keyof SketchData, value: any) => void;
+  
+  // Drawing Actions
+  addDrawing: (drawing: DrawingPath) => void;
+  deleteDrawing: (id: string) => void;
   
   // History Actions
   undo: () => void;
@@ -85,11 +107,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   history: [],
   future: [],
   savedSketches: [MOCK_ONE_STORY, MOCK_TWO_STORY, MOCK_THREE_STORY], // Initial Mock DB
+  renders: [],
   selection: null,
   unitSystem: 'metric',
+  viewStyle: 'blueprint',
   isGenerating: false,
+  isRendering: false,
+  currentRenderUrl: null,
   error: null,
   lastPrompt: '',
+  renderTrigger: 0,
 
   getCurrentSketch: () => {
     const { sketchOptions, currentOptionIndex } = get();
@@ -99,9 +126,30 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setSelection: (selection) => set({ selection }),
   setUnitSystem: (unitSystem) => set({ unitSystem }),
+  setViewStyle: (viewStyle) => set({ viewStyle }),
+  setIsRendering: (isRendering) => set({ isRendering }),
+  clearRender: () => set({ currentRenderUrl: null }),
+  triggerCanvasRender: () => set(state => ({ renderTrigger: state.renderTrigger + 1 })),
   
+  addRender: (url) => set((state) => {
+      const sketch = state.sketchOptions[state.currentOptionIndex];
+      const sketchId = sketch?.status === 'loaded' ? sketch.data.id : 'unknown';
+      const newRender: RenderImage = {
+          id: `render-${Date.now()}`,
+          sketchId,
+          url,
+          timestamp: Date.now(),
+          prompt: "Realistic Architectural Visualization"
+      };
+      return { renders: [newRender, ...state.renders] };
+  }),
+
+  deleteRender: (id) => set((state) => ({
+      renders: state.renders.filter(r => r.id !== id)
+  })),
+
   setCurrentOptionIndex: (index) => set((state) => {
-      return { currentOptionIndex: index, history: [], future: [], selection: null };
+      return { currentOptionIndex: index, history: [], future: [], selection: null, currentRenderUrl: null };
   }),
 
   failGeneration: (error) => set({ isGenerating: false, error }),
@@ -138,6 +186,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
         const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
         const finalData = await generateSingleSketch(prompt, styles[0], images);
+        finalData.drawings = []; // Ensure drawings initialized
         
         set((state) => {
              const newOpts = [...state.sketchOptions];
@@ -178,6 +227,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
            });
            sketch = await generateSketchFromImage(base64, file.type);
         }
+        sketch.drawings = []; // Ensure initialized
         
         set((state) => {
             const updatedOpts = [...state.sketchOptions];
@@ -205,6 +255,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       try {
          const styles: DesignStyle[] = ['Modern', 'Rustic', 'Creative'];
          const finalData = await generateSingleSketch(lastPrompt, styles[index]);
+         finalData.drawings = [];
          set((state) => {
              const updatedOpts = [...state.sketchOptions];
              updatedOpts[index] = { status: 'loaded', data: finalData };
@@ -219,6 +270,22 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
              return { isGenerating: false, error: `Failed to generate variation ${index+1}`, sketchOptions: updatedOpts };
          });
       }
+  },
+
+  generateRender: async (blueprintImage: string) => {
+    const sketch = get().getCurrentSketch();
+    if (!sketch) return;
+
+    // isRendering already set true by caller, but good safety
+    set({ isRendering: true, error: null });
+    try {
+        const url = await generateRealisticRender(sketch, blueprintImage);
+        get().addRender(url);
+        set({ isRendering: false, currentRenderUrl: url });
+    } catch (err) {
+        console.error(err);
+        set({ isRendering: false, error: "Failed to generate render." });
+    }
   },
 
   loadMock: (type: '1-story' | '2-story' | '3-story') => {
@@ -254,7 +321,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newData = { 
           ...currentData,
           rooms: [...currentData.rooms],
-          elements: [...currentData.elements]
+          elements: [...currentData.elements],
+          drawings: [...(currentData.drawings || [])]
       };
       if (type === 'room') {
          newData.rooms = newData.rooms.map(r => r.id === id ? { ...r, [field]: value } : r);
@@ -264,7 +332,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
       
-      // AUTO SAVE
       const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
       
       return { sketchOptions: newOpts, history: newHistory, future: [], ...autoSavedState };
@@ -285,7 +352,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
       
-      // AUTO SAVE
       const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
       return { sketchOptions: newOpts, history: newHistory, future: [], selection: null, ...autoSavedState };
@@ -299,7 +365,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newData = { 
           ...currentData,
           rooms: [...currentData.rooms],
-          elements: [...currentData.elements]
+          elements: [...currentData.elements],
+          drawings: [...(currentData.drawings || [])]
       };
       
       const config = getLibraryItem(type);
@@ -343,10 +410,57 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
       
-      // AUTO SAVE
       const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
       return { sketchOptions: newOpts, history: newHistory, future: [], selection: newSelection, ...autoSavedState };
+  }),
+
+  addDrawing: (drawing) => set((state) => {
+      const currentOpt = state.sketchOptions[state.currentOptionIndex];
+      if (currentOpt?.status !== 'loaded') return {};
+      const currentData = currentOpt.data;
+      const newHistory = [...state.history, currentData];
+      const newData = { 
+          ...currentData,
+          drawings: [...(currentData.drawings || []), drawing]
+      };
+      
+      const newOpts = [...state.sketchOptions];
+      newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
+      
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+      return { sketchOptions: newOpts, history: newHistory, future: [], ...autoSavedState };
+  }),
+
+  deleteDrawing: (id) => set((state) => {
+      const currentOpt = state.sketchOptions[state.currentOptionIndex];
+      if (currentOpt?.status !== 'loaded') return {};
+      const currentData = currentOpt.data;
+      const newHistory = [...state.history, currentData];
+      const newData = { 
+          ...currentData,
+          drawings: (currentData.drawings || []).filter(d => d.id !== id)
+      };
+      
+      const newOpts = [...state.sketchOptions];
+      newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
+      
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+      return { sketchOptions: newOpts, history: newHistory, future: [], ...autoSavedState };
+  }),
+
+  updateSketchMetadata: (field, value) => set((state) => {
+      const currentOpt = state.sketchOptions[state.currentOptionIndex];
+      if (currentOpt?.status !== 'loaded') return {};
+      const currentData = currentOpt.data;
+      
+      const newData = { ...currentData, [field]: value };
+      const newOpts = [...state.sketchOptions];
+      newOpts[state.currentOptionIndex] = { status: 'loaded', data: newData };
+      
+      // Update without pushing to history for metadata changes
+      const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
+      return { sketchOptions: newOpts, ...autoSavedState };
   }),
 
   undo: () => set((state) => {
@@ -358,7 +472,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: previous };
       
-      // AUTO SAVE
       const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
       
       return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null, ...autoSavedState };
@@ -373,7 +486,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const newOpts = [...state.sketchOptions];
       newOpts[state.currentOptionIndex] = { status: 'loaded', data: next };
       
-      // AUTO SAVE
       const autoSavedState = autoSave({ ...state, sketchOptions: newOpts } as ProjectState);
 
       return { sketchOptions: newOpts, history: newHistory, future: newFuture, selection: null, ...autoSavedState };
@@ -395,7 +507,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               sketchOptions: [{ status: 'loaded', data: JSON.parse(JSON.stringify(sketch)) }],
               currentOptionIndex: 0,
               history: [],
-              future: []
+              future: [],
+              currentRenderUrl: null,
+              renders: [] // Reset renders for new project load (in a real app, load from DB)
           });
       }
   },
@@ -408,7 +522,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           future: [],
           selection: null,
           isGenerating: false,
-          error: null
+          currentRenderUrl: null,
+          error: null,
+          renders: []
       });
   },
 

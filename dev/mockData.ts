@@ -1,4 +1,5 @@
 
+
 import { SketchData } from '../types';
 
 // --- MOCK 1: THE GLASS PAVILION (1-STORY) ---
@@ -47,7 +48,8 @@ export const MOCK_ONE_STORY: SketchData = {
         // OUTDOOR FURNITURE
         { id: 'e_lounge_1', roomId: 'r_pool_deck', type: 'sofa', floor: 1, x: 400, y: 500, width: 200, height: 80, rotation: 90 }, // Lounge chair
         { id: 'e_lounge_2', roomId: 'r_pool_deck', type: 'sofa', floor: 1, x: 400, y: 700, width: 200, height: 80, rotation: 90 }, // Lounge chair
-    ]
+    ],
+    drawings: []
 };
 
 // --- MOCK 2: HILLSIDE FAMILY ESTATE (2-STORY) ---
@@ -86,7 +88,8 @@ export const MOCK_TWO_STORY: SketchData = {
         { id: 'f_stairs_down', roomId: 'f_landing', type: 'stairs_down', floor: 2, x: 850, y: 550, width: 200, height: 200, rotation: 0 },
         { id: 'f_bed_m', roomId: 'f_master', type: 'bed_king', floor: 2, x: 1200, y: 900, width: 200, height: 200, rotation: 0 },
         { id: 'f_win_mas', roomId: 'f_master', type: 'window', floor: 2, x: 1300, y: 1300, width: 200, height: 15, rotation: 0 }, // View to balcony
-    ]
+    ],
+    drawings: []
 };
 
 // --- MOCK 3: STUNNING MODERN VILLA (3-STORY) ---
@@ -169,5 +172,6 @@ export const MOCK_THREE_STORY: SketchData = {
         
         // Roof Deck
         { id: 'f3_lounge', roomId: 'f3_roof', type: 'sofa_l_shape', floor: 3, x: 1800, y: 1200, width: 300, height: 300, rotation: 0 },
-    ]
+    ],
+    drawings: []
 };

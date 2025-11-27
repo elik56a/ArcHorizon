@@ -1,5 +1,5 @@
 
-import { Room, Connection, ArchitecturalElement } from './blueprint';
+import { Room, Connection, ArchitecturalElement, DrawingPath } from './blueprint';
 
 export interface SketchData {
   id: string;
@@ -10,6 +10,15 @@ export interface SketchData {
   rooms: Room[];
   connections: Connection[];
   elements: ArchitecturalElement[];
+  drawings: DrawingPath[];
+}
+
+export interface RenderImage {
+  id: string;
+  sketchId: string;
+  url: string;
+  timestamp: number;
+  prompt: string;
 }
 
 export type SketchOption = 
@@ -17,3 +26,5 @@ export type SketchOption =
   | { status: 'loading', id: string }
   | { status: 'pending', id: string }
   | { status: 'idle', id: string };
+
+export type ViewStyle = 'blueprint' | 'vivid';

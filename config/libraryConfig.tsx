@@ -56,6 +56,7 @@ export const LIBRARY_CONFIG: LibraryItem[] = [
   { type: 'desk', label: 'Work Desk', category: 'Furniture', defaultWidth: 100, defaultHeight: 50, icon: Monitor, isRoom: false },
   { type: 'wardrobe', label: 'Wardrobe', category: 'Furniture', defaultWidth: 120, defaultHeight: 50, icon: Archive, isRoom: false },
   { type: 'bookshelf', label: 'Bookshelf', category: 'Furniture', defaultWidth: 80, defaultHeight: 30, icon: Archive, isRoom: false },
+  { type: 'car', label: 'Car (Sedan)', category: 'Furniture', defaultWidth: 180, defaultHeight: 450, icon: Car, isRoom: false },
 
   // --- WET AREAS & APPLIANCES ---
   { type: 'toilet', label: 'Toilet', category: 'Wet Areas', defaultWidth: 45, defaultHeight: 60, icon: Bath, isRoom: false },

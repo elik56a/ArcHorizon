@@ -1,7 +1,8 @@
+
 import React, { useState, useRef } from 'react';
 import { SketchData } from '../../types';
-import Canvas3D from '../blueprint/Canvas3D';
-import Canvas2D from '../blueprint/Canvas2D';
+import Canvas3D from '../blueprint/3d/Canvas3D';
+import Canvas2D from '../blueprint/2d/Canvas2D';
 import { RotatingHouse } from './RotatingHouse';
 import { Canvas } from '@react-three/fiber';
 import { Environment, ContactShadows } from '@react-three/drei';

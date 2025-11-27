@@ -1,4 +1,3 @@
-
 import { SketchData } from '../../../types';
 import { normalizeTypes } from './normalization';
 import { sanitizeScale, pruneArtifacts } from './sanitization';

@@ -1,70 +1,120 @@
 
 import { SketchData, Room, ArchitecturalElement, RoomType } from '../../../types';
-import { isAdjacent, isExteriorWall, WALL_THICKNESS_EXT, WALL_THICKNESS_INT, getAbsoluteBounds, FRAME_THICKNESS, checkOverlap } from './utils';
+import { isAdjacent, isExteriorWall, WALL_THICKNESS_EXT, WALL_THICKNESS_INT, getAbsoluteBounds, checkOverlap, FRAME_THICKNESS } from './utils';
 
 export const ensureConnectivity = (data: SketchData) => {
-    // We iterate through all rooms and explicitly check their connectivity to neighbors
+    // Canonical pair tracking to avoid double processing
+    const processedPairs = new Set<string>();
+
     data.rooms.forEach(room => {
         if (['garden', 'parking', 'pool', 'terrace', 'balcony'].includes(room.type)) return;
         
         // FIND NEIGHBORS (ADJACENT OR VERY CLOSE)
         const neighbors = data.rooms.filter(n => n.id !== room.id && n.floor === room.floor && isAdjacent(room, n));
         
+        let connectedCount = 0;
+
         neighbors.forEach(neighbor => {
-             // 1. Check if these two SPECIFIC rooms are already connected
-             const isConnected = data.elements.some(el => {
+             const pairId = [room.id, neighbor.id].sort().join('-');
+             if (processedPairs.has(pairId)) return;
+             processedPairs.add(pairId);
+
+             const typeA = room.type;
+             const typeB = neighbor.type;
+             
+             // Open Plan Logic: Kitchen/Living/Dining/Entry connect with large openings
+             // If these types are touching, we assume open plan intent unless explicitly walled
+             const isSocialA = ['living','dining','kitchen','entry'].includes(typeA);
+             const isSocialB = ['living','dining','kitchen','entry'].includes(typeB);
+             const isOpenPlan = isSocialA && isSocialB && typeA !== 'bathroom' && typeB !== 'bathroom';
+
+             // CHECK FOR EXISTING CONNECTION
+             const existingConnectionIndex = data.elements.findIndex(el => {
                  if (!['door', 'entry_door', 'sliding_door', 'wall_opening'].includes(el.type)) return false;
-                 
-                 // If the door belongs to one room, check if it touches the other
-                 if (el.roomId === room.id) {
-                     return checkOverlap(getAbsoluteBounds(el), {x: neighbor.x, y: neighbor.y, w: neighbor.width, h: neighbor.height}, 15);
-                 }
-                 if (el.roomId === neighbor.id) {
-                     return checkOverlap(getAbsoluteBounds(el), {x: room.x, y: room.y, w: room.width, h: room.height}, 15);
-                 }
-                 return false;
+                 // Check overlap
+                 const elBox = getAbsoluteBounds(el);
+                 const touchesNeighbor = el.roomId === room.id && checkOverlap(elBox, {x: neighbor.x, y: neighbor.y, w: neighbor.width, h: neighbor.height}, 20);
+                 const touchesRoom = el.roomId === neighbor.id && checkOverlap(elBox, {x: room.x, y: room.y, w: room.width, h: room.height}, 20);
+                 return touchesNeighbor || touchesRoom;
              });
 
-             if (!isConnected) {
-                 // 2. Determine if we SHOULD connect them based on type logic
-                 const typeA = room.type;
-                 const typeB = neighbor.type;
-                 
-                 const isSocialA = ['living','dining','kitchen','corridor','entry'].includes(typeA);
-                 const isSocialB = ['living','dining','kitchen','corridor','entry'].includes(typeB);
-                 
-                 // High priority connections
-                 const shouldConnect = 
-                    (isSocialA && isSocialB) || // Open flow between social zones
-                    (typeA === 'bedroom' && (typeB === 'corridor' || typeB === 'living' || typeB === 'entry')) ||
-                    (typeB === 'bedroom' && (typeA === 'corridor' || typeA === 'living' || typeA === 'entry')) ||
-                    (typeA === 'bathroom' && (typeB === 'corridor' || typeB === 'bedroom')) ||
-                    (typeB === 'bathroom' && (typeA === 'corridor' || typeA === 'bedroom'));
+             const shouldConnect = 
+                isOpenPlan ||
+                (typeA === 'bedroom' && (typeB === 'corridor' || typeB === 'living' || typeB === 'entry')) ||
+                (typeB === 'bedroom' && (typeA === 'corridor' || typeA === 'living' || typeA === 'entry')) ||
+                (typeA === 'bathroom' && (typeB === 'corridor' || typeB === 'bedroom' || typeB === 'living')) ||
+                (typeB === 'bathroom' && (typeA === 'corridor' || typeA === 'bedroom' || typeA === 'living')) ||
+                (typeA === 'study' && (typeB === 'corridor' || typeB === 'living'));
 
-                 if (shouldConnect) {
-                     if (isSocialA && isSocialB) addOpenConnection(data, room, neighbor);
-                     else addDoorBetween(data, room, neighbor);
+             if (existingConnectionIndex !== -1) {
+                 // Connection exists.
+                 // CRITICAL: If Open Plan, remove standard doors and FORCE a large opening to erase the wall.
+                 // Aggressive mode: Force full overlap clearing
+                 if (isOpenPlan) {
+                     const el = data.elements[existingConnectionIndex];
+                     // If it's a door or a small opening, replace it. 
+                     // Even if it's a wall_opening, if it's too small, blow it up.
+                     if (el.type !== 'wall_opening' || el.width < 150) {
+                         data.elements.splice(existingConnectionIndex, 1);
+                         addOpenConnection(data, room, neighbor, true); 
+                     }
                  }
+                 connectedCount++;
+             } else if (shouldConnect) {
+                 // No connection exists, add one
+                 if (isOpenPlan) {
+                     addOpenConnection(data, room, neighbor, true);
+                 } else {
+                     addDoorBetween(data, room, neighbor);
+                 }
+                 connectedCount++;
              }
         });
+    });
 
-        // 3. Fallback: If a room still has ZERO doors after checking all neighbors, force one to the nearest valid neighbor
-        const hasAnyDoor = data.elements.some(el => el.roomId === room.id && ['door', 'entry_door', 'wall_opening'].includes(el.type));
-        if (!hasAnyDoor && neighbors.length > 0) {
-            const bestNeighbor = neighbors[0]; // Simplistic fallback
-            addDoorBetween(data, room, bestNeighbor);
-        } else if (!hasAnyDoor && neighbors.length === 0) {
-            // Absolute fallback for isolated rooms (should be rare with condensed topology)
-            addDefaultDoor(data, room);
+    // PASS 2: Ensure isolated rooms have at least one door
+    data.rooms.forEach(room => {
+        if (['garden', 'parking', 'pool', 'terrace', 'balcony'].includes(room.type)) return;
+        
+        const hasDoor = data.elements.some(el => el.roomId === room.id && ['door', 'entry_door', 'sliding_door', 'wall_opening'].includes(el.type));
+        
+        if (!hasDoor) {
+             const neighbors = data.rooms.filter(n => n.id !== room.id && n.floor === room.floor && isAdjacent(room, n));
+             
+             if (neighbors.length > 0) {
+                 const score = (r: Room) => (r.type === 'living' || r.type === 'corridor' ? 10 : 1);
+                 const bestNeighbor = neighbors.sort((a,b) => score(b) - score(a))[0];
+                 addDoorBetween(data, room, bestNeighbor);
+             } else {
+                 // Isolated (island) - connect to "center of house" direction
+                 if (room.type !== 'bathroom') {
+                     let bestTarget: Room | null = null;
+                     let minDist = Infinity;
+                     const center = { x: room.x + room.width/2, y: room.y + room.height/2 };
+                     
+                     data.rooms.forEach(other => {
+                        if (other.id === room.id || other.floor !== room.floor || ['garden','parking','pool'].includes(other.type)) return;
+                        const c2 = { x: other.x + other.width/2, y: other.y + other.height/2 };
+                        const dist = Math.hypot(center.x - c2.x, center.y - c2.y);
+                        if (dist < minDist) { minDist = dist; bestTarget = other; }
+                     });
+
+                     if (bestTarget) {
+                         addOrientedDoor(data, room, bestTarget);
+                     } else {
+                         addDefaultDoor(data, room);
+                     }
+                 }
+             }
         }
     });
 };
 
 const addDoorBetween = (data: SketchData, r1: Room, r2: Room) => {
     const doorW = 80; const h = WALL_THICKNESS_INT;
+    const CORNER_OFFSET = 60; // Keep away from corners
     let x=0, y=0, rot=0;
     
-    // Calc overlaps
     const xOverlapStart = Math.max(r1.x, r2.x);
     const xOverlapEnd = Math.min(r1.x + r1.width, r2.x + r2.width);
     const xOverlap = xOverlapEnd - xOverlapStart;
@@ -73,20 +123,19 @@ const addDoorBetween = (data: SketchData, r1: Room, r2: Room) => {
     const yOverlapEnd = Math.min(r1.y + r1.height, r2.y + r2.height);
     const yOverlap = yOverlapEnd - yOverlapStart;
 
-    if (xOverlap > 10) { 
+    if (xOverlap > (doorW + CORNER_OFFSET * 2)) { 
         rot = 0;
+        // Center in available overlap
         x = xOverlapStart + xOverlap/2 - doorW/2;
         y = (r1.y < r2.y) ? r1.y + r1.height - h/2 : r1.y - h/2;
-    } else if (yOverlap > 10) {
+    } else if (yOverlap > (doorW + CORNER_OFFSET * 2)) {
         rot = 90;
+        // Center in available overlap
         y = yOverlapStart + yOverlap/2 - doorW/2;
         x = (r1.x < r2.x) ? r1.x + r1.width - h/2 : r1.x - h/2;
     } else {
-        // Corner/Tight fit - force placement if close enough
-        if (Math.abs((r1.x + r1.width) - r2.x) < 20) { rot = 90; x = r1.x + r1.width - h/2; y = Math.max(r1.y, r2.y) + 10; } 
-        else if (Math.abs(r1.x - (r2.x + r2.width)) < 20) { rot = 90; x = r1.x - h/2; y = Math.max(r1.y, r2.y) + 10; } 
-        else if (Math.abs((r1.y + r1.height) - r2.y) < 20) { rot = 0; y = r1.y + r1.height - h/2; x = Math.max(r1.x, r2.x) + 10; } 
-        else { rot = 0; y = r1.y - h/2; x = Math.max(r1.x, r2.x) + 10; }
+        // Not enough space for a door
+        return; 
     }
 
     data.elements.push({ 
@@ -95,9 +144,42 @@ const addDoorBetween = (data: SketchData, r1: Room, r2: Room) => {
     });
 };
 
-const addOpenConnection = (data: SketchData, r1: Room, r2: Room) => {
+const addOrientedDoor = (data: SketchData, room: Room, target: Room) => {
+    const rc = { x: room.x + room.width/2, y: room.y + room.height/2 };
+    const tc = { x: target.x + target.width/2, y: target.y + target.height/2 };
+    const dx = tc.x - rc.x;
+    const dy = tc.y - rc.y;
+    
+    let wall = '';
+    if (Math.abs(dx) > Math.abs(dy)) {
+        wall = dx > 0 ? 'east' : 'west';
+    } else {
+        wall = dy > 0 ? 'south' : 'north';
+    }
+    
+    const width = 80;
+    const thick = WALL_THICKNESS_EXT; 
+    let x = 0, y = 0, rot = 0;
+    
+    // Initial Positioning
+    if (wall === 'north') { x = rc.x - width/2; y = room.y - thick/2; rot = 0; }
+    if (wall === 'south') { x = rc.x - width/2; y = room.y + room.height - thick/2; rot = 180; }
+    if (wall === 'west') { x = room.x - thick/2; y = rc.y - width/2; rot = 270; }
+    if (wall === 'east') { x = room.x + room.width - thick/2; y = rc.y - width/2; rot = 90; }
+
+    // Re-center on wall axis
+    if (wall === 'north' || wall === 'south') x = room.x + room.width/2 - width/2;
+    if (wall === 'east' || wall === 'west') y = room.y + room.height/2 - width/2;
+
+    data.elements.push({
+        id: `auto-d-oriented-${room.id}`, roomId: room.id, type: 'door', floor: room.floor,
+        x, y, width, height: thick, rotation: rot
+    });
+};
+
+const addOpenConnection = (data: SketchData, r1: Room, r2: Room, aggressive: boolean = false) => {
     const h = WALL_THICKNESS_INT;
-    let x=0, y=0, rot=0, w=160;
+    let x=0, y=0, rot=0, w=220; // Default wide opening
     
     const xOverlapStart = Math.max(r1.x, r2.x);
     const xOverlapEnd = Math.min(r1.x + r1.width, r2.x + r2.width);
@@ -107,17 +189,31 @@ const addOpenConnection = (data: SketchData, r1: Room, r2: Room) => {
     const yOverlapEnd = Math.min(r1.y + r1.height, r2.y + r2.height);
     const yOverlap = yOverlapEnd - yOverlapStart;
 
+    // IMPORTANT: To avoid cutting perpendicular exterior walls at the T-junctions,
+    // we use a buffer.
+    const MARGIN = aggressive ? 10 : 20;
+
+    // Maximize opening size but keep structure on sides IF not aggressive
+    const maxW_X = Math.max(100, xOverlap - MARGIN*2);
+    const maxW_Y = Math.max(100, yOverlap - MARGIN*2);
+
     if (xOverlap > 50) {
         rot = 0;
-        w = Math.min(xOverlap - 20, 300);
+        // Aggressive: Span almost the entire shared edge
+        w = aggressive ? Math.max(100, xOverlap - 10) : Math.min(xOverlap - 20, maxW_X); 
+        // Center the opening on the overlap
         x = xOverlapStart + xOverlap/2 - w/2;
+        // Exact Y on boundary
         y = (r2.y > r1.y) ? r1.y + r1.height - h/2 : r1.y - h/2;
     } else if (yOverlap > 50) {
         rot = 90;
-        w = Math.min(yOverlap - 20, 300);
+        w = aggressive ? Math.max(100, yOverlap - 10) : Math.min(yOverlap - 20, maxW_Y);
+        // Center the opening on the overlap
         y = yOverlapStart + yOverlap/2 - w/2;
+        // Exact X on boundary
         x = (r2.x > r1.x) ? r1.x + r1.width - h/2 : r1.x - h/2;
     } else {
+        // Fallback for corner-only touches
         addDoorBetween(data, r1, r2);
         return;
     }
@@ -164,28 +260,36 @@ export const fixDoors = (data: SketchData) => {
         const isExt = isExteriorWall(room, wall, data.rooms);
         const wallThick = isExt ? WALL_THICKNESS_EXT : WALL_THICKNESS_INT;
         
+        // Set dimensions to match wall exactly
         const currentLong = Math.max(el.width, el.height);
         el.width = currentLong;
         el.height = wallThick; 
 
+        // CRITICAL: Limit Door Widths (Do not allow doors to stretch to fill walls like windows)
+        if (['door', 'entry_door', 'door_internal'].includes(el.type)) {
+            const maxW = el.type === 'entry_door' ? 120 : 100;
+            if (el.width > maxW) el.width = maxW;
+        }
+
         if (wall === 'north') {
             el.rotation = 0;
+            // Snap CENTER Y exactly to wall centerline (room.y)
             el.y = room.y - wallThick/2;
-            el.x = Math.max(room.x, Math.min(el.x, room.x + room.width - el.width));
+            el.x = Math.max(room.x + 10, Math.min(el.x, room.x + room.width - el.width - 10));
         } else if (wall === 'south') {
             el.rotation = 180;
-            el.y = room.y + room.height - wallThick/2;
-            el.x = Math.max(room.x, Math.min(el.x, room.x + room.width - el.width));
+            el.y = (room.y + room.height) - wallThick/2;
+            el.x = Math.max(room.x + 10, Math.min(el.x, room.x + room.width - el.width - 10));
         } else if (wall === 'west') {
             el.rotation = 270; 
             el.x = room.x - wallThick/2;
             const originalCenterY = cy;
-            el.y = Math.max(room.y + el.width/2, Math.min(originalCenterY, room.y + room.height - el.width/2)) - el.width/2;
+            el.y = Math.max(room.y + el.width/2 + 10, Math.min(originalCenterY, room.y + room.height - el.width/2 - 10)) - el.width/2;
         } else if (wall === 'east') {
             el.rotation = 90; 
-            el.x = room.x + room.width - wallThick/2;
+            el.x = (room.x + room.width) - wallThick/2;
             const originalCenterY = cy;
-            el.y = Math.max(room.y + el.width/2, Math.min(originalCenterY, room.y + room.height - el.width/2)) - el.width/2;
+            el.y = Math.max(room.y + el.width/2 + 10, Math.min(originalCenterY, room.y + room.height - el.width/2 - 10)) - el.width/2;
         }
     });
 };

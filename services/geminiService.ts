@@ -13,6 +13,71 @@ export interface ImageAttachment {
   data: string;
 }
 
+// --- HELPER: RETRY LOGIC ---
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, backoff = 1000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      // Retry on network errors (xhr/fetch), timeouts, or 5xx server errors
+      const msg = error.message?.toLowerCase() || '';
+      const isNetworkError = msg.includes('xhr') || msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch');
+      const isServerError = error.code === 500 || error.code === 503 || error.status === 500 || error.status === 503;
+      
+      if (isNetworkError || isServerError) {
+        console.warn(`Gemini API Attempt ${i + 1} failed. Retrying in ${backoff}ms...`, error);
+        await wait(backoff);
+        backoff *= 2; // Exponential backoff
+        continue;
+      }
+      throw error; // Throw immediately for other errors (e.g. 400 Bad Request)
+    }
+  }
+  throw lastError;
+}
+
+// --- HELPER: DATA SANITIZATION ---
+const sanitizeData = (data: SketchData): SketchData => {
+    // 1. Ensure numeric types for geometry
+    // Note: We use Number() directly without || fallback initially to detect 0
+    data.floors = Math.max(1, Number(data.floors) || 1);
+    
+    data.rooms = data.rooms.map(r => ({
+        ...r,
+        x: Number(r.x),
+        y: Number(r.y),
+        width: Number(r.width),
+        height: Number(r.height),
+        floor: !isNaN(Number(r.floor)) ? Number(r.floor) : 1
+    }));
+
+    data.elements = data.elements.map(e => ({
+        ...e,
+        x: Number(e.x),
+        y: Number(e.y),
+        width: Number(e.width),
+        height: Number(e.height),
+        floor: !isNaN(Number(e.floor)) ? Number(e.floor) : 1
+    }));
+
+    // 2. Fix 0-based indexing (AI often likes 0 for Ground Floor)
+    // If we detect any room or element on floor 0, we shift EVERYTHING up by 1.
+    const hasZeroFloor = data.rooms.some(r => r.floor === 0) || data.elements.some(e => e.floor === 0);
+    
+    if (hasZeroFloor) {
+        console.log("Detected 0-based floor indexing. Shifting all floors by +1.");
+        data.floors += 1;
+        data.rooms.forEach(r => r.floor += 1);
+        data.elements.forEach(e => e.floor += 1);
+    }
+
+    return data;
+};
+
 // --- SCHEMA DEFINITIONS ---
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -105,7 +170,7 @@ export const createArchitectSession = (): Chat => {
             4. **IMAGES**: If the user provides images, analyze them for style cues and acknowledge them specificially.
             5. **VERIFICATION**: Before calling 'propose_design', summarize the *exact* list of rooms and floors you are about to generate and ask the user to confirm.
             6. **CONFIRMATION**: Once confirmed, call the 'propose_design' tool.
-            7. **LAYOUT STRATEGY**: Prioritize open-plan layouts. Discourage hallways unless necessary for privacy in sleeping wings.
+            7. **LAYOUT STRATEGY**: Prioritize open-plan layouts (Kitchen/Living/Dining merged) unless the user explicitly asks for closed rooms.
             
             TONE: Professional, creative, encouraging, and inquisitive. Use architectural terminology but keep it accessible.
             `,
@@ -118,164 +183,296 @@ export const createArchitectSession = (): Chat => {
 // --- GENERATION FUNCTIONS ---
 
 export const generateSingleSketch = async (prompt: string, style: DesignStyle, images: ImageAttachment[] = []): Promise<SketchData> => {
-  try {
-    const textPrompt = `
-      ROLE: Senior Architectural CAD Technician.
-      TASK: Generate a detailed construction-grade floor plan based on: "${prompt}".
-      CONTEXT: If images are provided, use them as reference for visual style, layout arrangement, or site constraints.
-      
-      STRICT ADHERENCE PROTOCOL:
-      1. **NO HALLUCINATIONS**: Generate ONLY the rooms and floors explicitly requested in the prompt.
-      2. **EXACT COUNT**: If the prompt says "2 bedrooms", generate exactly 2.
-      3. **ENTRY POLICY**: Do NOT generate a separate room for 'Entry' unless explicitly asked for a Foyer/Vestibule. Instead, place an 'entry_door' element on the facade of the Living Room or Corridor.
-      4. **OPEN PLAN PROTOCOL**: AVOID CORRIDORS. Connect rooms directly to a central Living Room or small Hallway. Do not create long, narrow 'corridor' rooms that isolate spaces. Maximize usable floor area.
-      
-      CRITICAL DESIGN STANDARDS:
-      1. **REALISM**: Do not generate empty boxes. Every room must be furnished with specific CAD blocks.
-      2. **STRUCTURAL LOGIC**: Walls should align. Wet areas (Kitchen/Bath) should share plumbing walls where possible.
-      3. **CIRCULATION**: Ensure clear walking paths (min 90cm) between furniture.
-      
-      DETAILED FURNITURE REQUIREMENTS (Use these specific types):
-      - **BEDROOM**: 'bed_king' or 'bed_single', plus 'nightstand' (x2), 'wardrobe' (large rect).
-      - **LIVING**: 'sofa' or 'sofa_l_shape', 'coffee_table', 'tv_unit', 'armchair'.
-      - **KITCHEN**: 'kitchen_island' (if space permits), 'stove', 'fridge', 'kitchen_sink' (on counter).
-      - **BATHROOM**: 'toilet' (against wall), 'sink_single' or 'sink_double', 'shower' (corner or box), 'bathtub'.
-      - **DINING**: 'dining_table' (include space for chairs).
-      - **ENTRY**: 'entry_door' (Mandatory).
-      
-      DIMENSIONING RULES (Unit = CM):
-      - External Walls: 20-30cm thickness implied.
-      - Internal Walls: 10-15cm thickness implied.
-      - Doors: Standard width 80-90cm. Entry door 100cm.
-      - Windows: Align with furniture layouts (e.g., not behind a tall wardrobe).
-      
-      OUTPUT FORMAT: Pure JSON matching the schema.
-    `;
+  return withRetry(async () => {
+    try {
+      const textPrompt = `
+ROLE: Senior Architectural CAD Technician + Space-Planning Expert.
+TASK: Generate a detailed, construction-grade, fully furnished floor plan JSON based on: "${prompt}".
+CONTEXT: If images are provided, treat them as authoritative constraints for style, layout, orientation, or site edges.
 
-    const parts: any[] = [{ text: textPrompt }];
-    images.forEach(img => {
-        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
-    });
+========================
+STRICT ADHERENCE PROTOCOL (NON-NEGOTIABLE)
+========================
+1) NO HALLUCINATIONS:
+   - Generate ONLY rooms/floors explicitly requested.
+   - If a room type is not requested, do not add it unless it is a REQUIRED SUPPORT ROOM listed below.
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA
-      }
-    });
+2) EXACT COUNT:
+   - If prompt says "2 bedrooms", generate exactly 2 bedrooms, no more, no less.
+   - Same for bathrooms, floors, parking spots, etc.
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    
-    const data = JSON.parse(text) as SketchData;
+3) REQUIRED SUPPORT ROOMS (Allowed even if not named):
+   - If prompt includes "parking/garage", you may add a mudroom/entry buffer.
+   - If prompt includes "2+ floors", stairs are mandatory.
+   - Otherwise: do NOT add extra rooms.
 
-    // SANITIZATION: Force numbers for critical fields to prevent UI bugs
-    data.floors = Number(data.floors) || 1;
-    data.rooms = data.rooms.map(r => ({
-        ...r,
-        floor: Number(r.floor) || 1,
-        x: Number(r.x),
-        y: Number(r.y),
-        width: Number(r.width),
-        height: Number(r.height)
-    }));
-    data.elements = data.elements.map(e => ({
-        ...e,
-        floor: Number(e.floor) || 1,
-        x: Number(e.x),
-        y: Number(e.y),
-        width: Number(e.width),
-        height: Number(e.height)
-    }));
-    
-    // RUN GEOMETRY ENGINE (The "Architect" Reviewer)
-    const optimizedData = optimizeDesign(data);
+4) MAIN ENTRY PLACEMENT (CRITICAL):
+   - MUST include exactly one 'entry_door' on an exterior wall.
+   - Place entry logically near street/parking access.
+   - Entry must lead into a Foyer OR directly into Living (but not into Bedroom/Bathroom/Kitchen).
 
-    return optimizedData;
-  } catch (error) {
-    console.error(`AI Generation Error (${style}):`, error);
-    throw error;
-  }
+5) OPEN PLAN PROTOCOL (CRITICAL):
+   If Open Plan / Open Concept / Common Space requested:
+   - Living + Kitchen + Dining must be directly adjacent (touching).
+   - No doors between them.
+   - Mandatory internal 'wall_opening' with Width > 300 cm on shared boundary.
+   - Forbidden: wall_opening on exterior perimeter walls.
+
+6) FLOORS & STAIRS:
+   - Floors use INTEGER numbering starting at 1.
+   - If floors >= 2: include 'stairs' element/room, aligned vertically between floors.
+
+========================
+ARCHITECTURAL HARD RULES (10-YEAR ARCHITECT LEVEL)
+========================
+1) ZONING / PRIVACY:
+   - Separate PUBLIC zone (Living/Dining/Kitchen/Entry) from PRIVATE zone (Bedrooms).
+   - Bedrooms must NOT open directly into Living/Kitchen/Dining.
+   - Access bedrooms through a hall/transition space.
+
+2) FUNCTIONAL ADJACENCIES:
+   - Kitchen adjacent to Dining.
+   - Guest/Shared Bathroom must be near public zone but not open directly into Dining/Living.
+   - Laundry (if requested) near bedrooms OR mudroom/entry if designed for dirty-use logic.
+
+3) BATHROOM VISIBILITY RULE:
+   - No bathroom door may face directly into Dining or Living.
+   - If a bathroom is near public zone, it must be tucked via a short hall or offset wall.
+
+4) CIRCULATION & CLEARANCES:
+   - Main circulation paths >= 90 cm clear width.
+   - Space between sofa/coffee_table or bed/side furniture allows passage (>= 60 cm).
+   - Avoid dead-end corridors longer than 300 cm unless explicitly required.
+
+5) FURNITURE-FIRST SIZING (REALISM):
+   - Every room must be sized to fit its mandatory furniture with clearances.
+   - Example:
+     * Bedrooms must fit at least queen/king bed + 2 nightstands + wardrobe with 60–90 cm side clearance.
+     * Dining must allow table + chair pullout clearance (>= 90 cm behind chairs).
+
+6) WINDOW LOGIC (IF WINDOWS ARE IN SCHEMA):
+   - Place windows on exterior walls of habitable rooms (Living/Bedrooms/Kitchen/Dining).
+   - At least one operable window per habitable room.
+   - Do not place tall furniture (wardrobe, fridge, tv_unit) blocking windows.
+   - Avoid placing bathroom windows on public-facing walls at eye level; prefer high/frosted or corner positions.
+
+7) WET AREA GROUPING:
+   - Kitchens, bathrooms, laundry should share plumbing walls when possible.
+   - Prefer stacking wet rooms between floors (vertical alignment).
+
+8) FORM SIMPLICITY:
+   - Avoid unnecessary exterior indentations/zigzags unless prompt requires.
+   - Compact, clean perimeter is preferred.
+
+========================
+CRITICAL DESIGN STANDARDS
+========================
+1) REALISM:
+   - No empty boxes. Every room furnished.
+   - Furniture placed plausibly (not floating, not overlapping walls).
+
+2) STRUCTURAL LOGIC:
+   - Walls align across rooms and between floors.
+   - Door/window openings must be on walls and centered where logical.
+
+3) DOOR PLACEMENT:
+   - Doors must sit exactly on boundary lines between rooms.
+   - Standard interior door width: 80–90 cm; entry door: 100 cm.
+   - Door swings must not collide with furniture or block main circulation.
+
+========================
+DETAILED FURNITURE REQUIREMENTS (Use these exact types)
+========================
+- BEDROOM:
+  'bed_king' or 'bed_single' + 'nightstand' x2 + 'wardrobe'
+- LIVING:
+  'sofa' or 'sofa_l_shape' + 'coffee_table' + 'tv_unit' + 'armchair'
+- KITCHEN:
+  'stove' + 'fridge' + 'kitchen_sink' (+ 'kitchen_island' if space permits with 100cm circulation around island)
+- BATHROOM:
+  'toilet' against wall + 'sink_single'/'sink_double' + 'shower' corner/box (+ 'bathtub' if prompt requests)
+- DINING:
+  'dining_table' with chair clearance
+- ENTRY:
+  'entry_door' mandatory
+- GARAGE/PARKING:
+  room type 'parking', name 'Garage' if enclosed, 'Driveway' if open.
+  Must include 'car' element x1 or x2 per prompt.
+- POOL:
+  room type 'pool'
+
+========================
+DIMENSIONING RULES (Unit = CM)
+========================
+- External Walls: 25 cm thick implied.
+- Internal Walls: 20 cm thick implied.
+- Doors: interior 80–90 cm; entry 100 cm.
+- Clear paths >= 90 cm.
+
+OUTPUT FORMAT:
+- Pure JSON matching the schema.
+- No markdown, no explanations, no extra keys.
+      `;
+
+      const parts: any[] = [{ text: textPrompt }];
+      images.forEach(img => {
+          parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+      });
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("No response from AI");
+      
+      let data = JSON.parse(text) as SketchData;
+
+      // SANITIZATION: Fix potential 0-based floor index bugs from LLM
+      data = sanitizeData(data);
+      
+      // RUN GEOMETRY ENGINE (The "Architect" Reviewer)
+      const optimizedData = optimizeDesign(data);
+
+      return optimizedData;
+    } catch (error) {
+      console.error(`AI Generation Error (${style}):`, error);
+      throw error;
+    }
+  });
 };
 
 export const generateSketchFromImage = async (base64Data: string, mimeType: string): Promise<SketchData> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
+  return withRetry(async () => {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: base64Data
+              }
+            },
+            {
+              text: `
+              ACT AS: Lead BIM Modeler.
+              TASK: Vectorize this raster floor plan into a CAD-ready JSON format.
+              
+              REQUIREMENTS:
+              1. **PRECISION**: Trace walls and rooms exactly.
+              2. **COMPONENT RECOGNITION**: Identify specific furniture (Toilets, Beds, Sofas) and use the correct 'type' enum.
+              3. **SCALE**: Estimate scale based on standard door widths (90cm).
+              4. **FLOORS**: Start numbering floors at 1.
+              `
             }
-          },
-          {
-            text: `
-            ACT AS: Lead BIM Modeler.
-            TASK: Vectorize this raster floor plan into a CAD-ready JSON format.
-            
-            REQUIREMENTS:
-            1. **PRECISION**: Trace walls and rooms exactly.
-            2. **COMPONENT RECOGNITION**: Identify specific furniture (Toilets, Beds, Sofas) and use the correct 'type' enum.
-            3. **SCALE**: Estimate scale based on standard door widths (90cm).
-            `
-          }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA
-      }
-    });
+          ]
+        },
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA
+        }
+      });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
+      const text = response.text;
+      if (!text) throw new Error("No response from AI");
 
-    const data = JSON.parse(text) as SketchData;
-    data.floors = Number(data.floors) || 1;
-    data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
-    data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
-    
-    const optimizedData = optimizeDesign(data);
-    return optimizedData;
-  } catch (error) {
-    console.error("AI Vision Error:", error);
-    throw error;
-  }
+      let data = JSON.parse(text) as SketchData;
+      
+      // SANITIZATION
+      data = sanitizeData(data);
+      
+      const optimizedData = optimizeDesign(data);
+      return optimizedData;
+    } catch (error) {
+      console.error("AI Vision Error:", error);
+      throw error;
+    }
+  });
 };
 
 export const generateSketchFromDXF = async (dxfContent: string): Promise<SketchData> => {
-    try {
-        const contentSample = dxfContent.length > 500000 ? dxfContent.substring(0, 500000) + "...[TRUNCATED]" : dxfContent;
+    return withRetry(async () => {
+        try {
+            const contentSample = dxfContent.length > 500000 ? dxfContent.substring(0, 500000) + "...[TRUNCATED]" : dxfContent;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `
+                ACT AS: Senior CAD Interoperability Engineer.
+                TASK: Convert DXF entities to a semantic Architectural JSON Schema.
+                INPUT: \`\`\`${contentSample}\`\`\`
+                `,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: RESPONSE_SCHEMA
+                }
+            });
+
+            const text = response.text;
+            if (!text) throw new Error("No response from AI");
+            let data = JSON.parse(text) as SketchData;
+            
+            // SANITIZATION
+            data = sanitizeData(data);
+
+            const optimizedData = optimizeDesign(data);
+            return optimizedData;
+        } catch (error) {
+            console.error("AI DXF Parsing Error:", error);
+            throw error;
+        }
+    });
+}
+
+export const generateRealisticRender = async (data: SketchData, blueprintImage: string): Promise<string> => {
+    return withRetry(async () => {
+        const description = `
+        TASK: Architectural Visualization - Image to Image.
+        INPUT: A precise 2D floor plan layout image.
+        INSTRUCTION: Generate a high-fidelity, photorealistic top-down render that MATCHES THE INPUT LINE DRAWING EXACTLY (1:1).
+        
+        STRICT CONSTRAINTS:
+        1. **GEOMETRY LOCK**: Do NOT move, add, or remove walls, doors, or windows. The layout is final.
+        2. **FURNITURE MATCH**: Furnish the rooms exactly where the boxes are in the drawing. If there is a sofa box, render a photorealistic sofa there.
+        3. **STYLE**: Modern Minimalist, Warm Lighting, Hardwood Floors.
+        4. **PERSPECTIVE**: Strictly Top-Down (Plan View). No angled isometric views.
+        
+        ROOMS: ${data.rooms.map(r => r.name).join(', ')}.
+        `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `
-            ACT AS: Senior CAD Interoperability Engineer.
-            TASK: Convert DXF entities to a semantic Architectural JSON Schema.
-            INPUT: \`\`\`${contentSample}\`\`\`
-            `,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: RESPONSE_SCHEMA
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: 'image/png', data: blueprintImage } },
+                    { text: description }
+                ]
             }
         });
 
-        const text = response.text;
-        if (!text) throw new Error("No response from AI");
-        const data = JSON.parse(text) as SketchData;
+        let base64Image = '';
         
-        data.floors = Number(data.floors) || 1;
-        data.rooms = data.rooms.map(r => ({ ...r, floor: Number(r.floor) || 1 }));
-        data.elements = data.elements.map(e => ({ ...e, floor: Number(e.floor) || 1 }));
+        if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    base64Image = part.inlineData.data;
+                    break;
+                }
+            }
+        }
 
-        const optimizedData = optimizeDesign(data);
-        return optimizedData;
-    } catch (error) {
-        console.error("AI DXF Parsing Error:", error);
-        throw error;
-    }
-}
+        if (!base64Image) {
+            throw new Error("No image generated.");
+        }
+
+        return `data:image/png;base64,${base64Image}`;
+    });
+};
+    

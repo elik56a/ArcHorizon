@@ -66,7 +66,8 @@ export const isElementOnWall = (el: ArchitecturalElement, room: Room, wall: stri
 };
 
 export const isAdjacent = (r1: Room, r2: Room) => {
-    const tol = 50; // Increased to 50cm to catch rooms separated by gaps
+    // Increased tolerance to 50cm to account for slight drifts or gaps in generation
+    const tol = 50; 
     const r1R = r1.x + r1.width, r1B = r1.y + r1.height;
     const r2R = r2.x + r2.width, r2B = r2.y + r2.height;
     return ((Math.abs(r1R - r2.x) < tol || Math.abs(r1.x - r2R) < tol) && !(r1B <= r2.y || r1.y >= r2B)) ||

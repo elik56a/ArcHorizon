@@ -1,4 +1,5 @@
 
+
 export type RoomType = 
   | 'bedroom' | 'living' | 'kitchen' | 'bathroom' | 'corridor' 
   | 'balcony' | 'storage' | 'dining' | 'entry' | 'stairs'
@@ -35,12 +36,12 @@ export type ElementType =
   | 'door' | 'window' | 'entry_door' | 'sliding_door' | 'pocket_door' | 'wall_opening'
   | 'bed_king' | 'bed_queen' | 'bed_single' | 'nightstand'
   | 'sofa' | 'sofa_l_shape' | 'armchair' | 'coffee_table' | 'tv_unit'
-  | 'dining_table' | 'chair'
+  | 'dining_table' | 'chair' | 'table'
   | 'toilet' | 'sink_single' | 'sink_double' | 'shower' | 'bathtub' | 'bathtub_corner'
   | 'stove' | 'fridge' | 'kitchen_island' | 'kitchen_sink'
   | 'washer' | 'dryer'
   | 'desk' | 'wardrobe' | 'bookshelf'
-  | 'stairs_up' | 'stairs_down'
+  | 'stairs_up' | 'stairs_down' | 'stairs'
   | 'tree' | 'car' | 'garden' | 'parking' | 'pool';
 
 export interface ArchitecturalElement {
@@ -56,4 +57,12 @@ export interface ArchitecturalElement {
   color?: string;
   opacity?: number;
   label?: string;
+}
+
+export interface DrawingPath {
+  id: string;
+  points: {x: number, y: number}[];
+  strokeWidth: number;
+  color: string;
+  floor: number;
 }

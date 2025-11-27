@@ -99,19 +99,45 @@ const validateWindowLocation = (el: ArchitecturalElement, parentRoom: Room, allR
 
 export const pruneExteriorDoors = (data: SketchData): SketchData => {
     const validExteriorTargets = ['balcony', 'terrace', 'garden', 'parking', 'pool', 'entry'];
-    data.elements.forEach(el => {
-        if (el.type !== 'door') return; 
-        const room = data.rooms.find(r => r.id === el.roomId);
-        if (!room) return;
-
-        // CRITICAL FIX: Ensure we don't prune interior doors that might be slightly misaligned.
-        // Check if this door overlaps ANY other room (except its own owner).
-        const doorBox = getAbsoluteBounds(el);
-        // Increase buffer to 20cm to be safe against slight gaps
-        const touchesOtherRoom = data.rooms.some(r => r.id !== el.roomId && r.floor === el.floor && checkOverlap(doorBox, {x:r.x, y:r.y, w:r.width, h:r.height}, 20));
+    
+    data.elements = data.elements.filter(el => {
+        if (!['door', 'sliding_door', 'wall_opening'].includes(el.type)) return true;
         
-        if (touchesOtherRoom) return; // It connects to something, so it is Interior.
+        const room = data.rooms.find(r => r.id === el.roomId);
+        if (!room) return false;
 
+        // Check if overlaps any other room (implies Interior)
+        const box = getAbsoluteBounds(el);
+        // Use overlap check to detect interior partition placement
+        const touchesOtherRoom = data.rooms.some(r => r.id !== el.roomId && r.floor === el.floor && checkOverlap(box, {x:r.x, y:r.y, w:r.width, h:r.height}, 15));
+        
+        if (touchesOtherRoom) return true; // Interior element, SAFE to keep.
+
+        // --- IT IS AN EXTERIOR ELEMENT ---
+        
+        // 1. WALL OPENINGS ON EXTERIOR -> DELETE (Fix for disappearing walls)
+        // Unless it explicitly leads to a Terrace/Balcony
+        if (el.type === 'wall_opening') {
+             // Calculate center to find "outside"
+             const cx = el.x + el.width/2;
+             const cy = el.y + el.height/2;
+             // Naive neighbor check at center point projected out
+             // (Logic simplified: if it didn't touch another room above, it's likely leading to void or non-room)
+             // We can check if it overlaps a specific outdoor zone
+             const touchesOutdoorZone = data.rooms.some(r => 
+                 ['balcony','terrace','garden','pool'].includes(r.type) && 
+                 r.floor === el.floor && 
+                 checkOverlap(box, {x:r.x, y:r.y, w:r.width, h:r.height}, 20)
+             );
+             
+             if (touchesOutdoorZone) return true; // Valid opening to deck
+             
+             // Otherwise, it's a hole in the house. DELETE.
+             return false;
+        }
+
+        // 2. DOORS ON EXTERIOR
+        // Only allow if leading to valid target OR if it's a service/living room back door
         const cx = el.x + el.width/2;
         const cy = el.y + el.height/2;
         let wall = '';
@@ -126,23 +152,42 @@ export const pruneExteriorDoors = (data: SketchData): SketchData => {
         else if (minDist === distW) wall = 'west';
         else if (minDist === distE) wall = 'east';
 
-        if (isExteriorWall(room, wall, data.rooms)) {
-            let testX = cx, testY = cy;
-            const offset = 50; 
-            if (wall === 'north') testY -= offset;
-            if (wall === 'south') testY += offset;
-            if (wall === 'west') testX -= offset;
-            if (wall === 'east') testX += offset;
-            
-            const targetRoom = data.rooms.find(r => r.floor === el.floor && testX >= r.x && testX <= r.x + r.width && testY >= r.y && testY <= r.y + r.height);
-            
-            // If it leads to nowhere, or to a non-exterior target that isn't connected, convert to window
-            if (!targetRoom || !validExteriorTargets.includes(targetRoom.type)) {
+        let leadsToValidOutdoorSpace = false;
+        
+        // Project point outwards to check target
+        let testX = cx, testY = cy;
+        const offset = 60; 
+        if (wall === 'north') testY -= offset;
+        if (wall === 'south') testY += offset;
+        if (wall === 'west') testX -= offset;
+        if (wall === 'east') testX += offset;
+        
+        const targetRoom = data.rooms.find(r => r.floor === el.floor && testX >= r.x && testX <= r.x + r.width && testY >= r.y && testY <= r.y + r.height);
+        
+        if (targetRoom && validExteriorTargets.includes(targetRoom.type)) {
+            leadsToValidOutdoorSpace = true;
+        }
+
+        const isServiceRoom = ['kitchen','utility','entry','living'].includes(room.type);
+
+        if (!leadsToValidOutdoorSpace) {
+            if (isServiceRoom) {
+                // If main entry room, ensure it's an entry_door
+                if (room.type === 'entry' && el.type !== 'entry_door') {
+                    el.type = 'entry_door';
+                    el.width = 100;
+                }
+                return true;
+            } else {
+                // Bedroom/Bath doors to void -> Convert to Window
                 el.type = 'window';
                 el.width = 100;
-                el.height = 22; 
+                el.height = 22;
+                return true;
             }
         }
+        
+        return true;
     });
     return data;
 };

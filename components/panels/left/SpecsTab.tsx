@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { getGroupedLibraryItems, LibraryItem } from '../../../config/libraryConfig';
 import { THEME } from '../../../theme';
 import { useProjectStore } from '../../../store/useProjectStore';
-import { Ruler, Sparkles, ChevronUp, ChevronDown, Send, Loader2, Plus, Minus, Image as ImageIcon, X } from 'lucide-react';
+import { Ruler, Sparkles, ChevronUp, ChevronDown, Send, Loader2, Plus, Minus, Image as ImageIcon, X, LayoutTemplate } from 'lucide-react';
 
 export const SpecsTab: React.FC = () => {
     const { isGenerating, generateByPrompt, unitSystem, setUnitSystem } = useProjectStore();
@@ -13,6 +13,7 @@ export const SpecsTab: React.FC = () => {
     const [area, setArea] = useState(120);
     const [floors, setFloors] = useState(1);
     const [designStyle, setDesignStyle] = useState('Modern');
+    const [openPlan, setOpenPlan] = useState(true);
     const [customNotes, setCustomNotes] = useState('');
     
     // File Upload State
@@ -69,6 +70,7 @@ export const SpecsTab: React.FC = () => {
         // Build the Prompt
         let prompt = `Create a ${designStyle} ${buildingType} with ${floors} floors. `;
         prompt += `Total Area: ${area} ${isImperial ? 'sq ft' : 'm²'}. `;
+        prompt += `Layout Strategy: ${openPlan ? "Open Concept: Create distinct Living Room and Kitchen rooms but place them adjacent with a large opening." : "Traditional: Enclosed rooms with doors."}. `;
         
         // Add Quantities from Dynamic List
         const requestedItems = Object.entries(itemQuantities).map(([type, count]) => {
@@ -177,6 +179,28 @@ export const SpecsTab: React.FC = () => {
                                        <label className={THEME.label}>Floors</label>
                                        <input type="number" min="1" max="5" className={THEME.input} value={floors} onChange={e => setFloors(Number(e.target.value))}/>
                                     </div>
+                                </div>
+                                
+                                {/* Refined Open Plan Toggle */}
+                                <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white mt-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-1.5 bg-gray-100 rounded text-gray-600">
+                                            <LayoutTemplate size={16} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-gray-900">Open Concept</span>
+                                            <span className="text-[10px] text-gray-500">Connected Living & Kitchen</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setOpenPlan(!openPlan)}
+                                        className={`relative w-10 h-5 rounded-full transition-colors duration-300 ${openPlan ? 'bg-black' : 'bg-gray-300'}`}
+                                    >
+                                        <div 
+                                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300 ${openPlan ? 'translate-x-5' : 'translate-x-0'}`} 
+                                        />
+                                    </button>
                                 </div>
                              </div>
                         </div>

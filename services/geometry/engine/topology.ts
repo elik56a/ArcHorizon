@@ -1,4 +1,3 @@
-
 import { SketchData, Room } from '../../../types';
 import { isAdjacent, getRoomBounds } from './utils';
 
@@ -43,9 +42,6 @@ export const condenseLayout = (data: SketchData): SketchData => {
             for (const room of floorRooms) {
                 if (cluster.has(room.id)) continue;
                 
-                // Ignore landscape/exterior rooms for tight packing, handle them last or loosely
-                // (Optional: keep them included to ensure they attach to house)
-
                 // If it's already adjacent to something in cluster, add it and continue
                 const touching = floorRooms.find(c => cluster.has(c.id) && isAdjacent(room, c));
                 if (touching) {
@@ -71,12 +67,12 @@ export const condenseLayout = (data: SketchData): SketchData => {
 
             // If we found a room adjacent, the loop `break` triggered, and we just continue to next iteration
             if (!bestRoom && cluster.size !== floorRooms.length) {
-                // If we didn't find a 'bestRoom' but we aren't done, it means we handled an adjacent one
                 continue;
             }
 
             // If we found a candidate that isn't touching, move it
             if (bestRoom && targetRoom) {
+                // @ts-ignore
                 snapToRoom(data, bestRoom, targetRoom);
                 cluster.add(bestRoom.id);
             } else if (!bestRoom) {
@@ -211,6 +207,8 @@ export const stackFloors = (data: SketchData): SketchData => {
     // Anchor to the first floor (usually Ground)
     const baseFloor = floors[0];
     const baseRooms = data.rooms.filter(r => r.floor === baseFloor);
+    if (baseRooms.length === 0) return data;
+
     const baseBounds = getRoomBounds(baseRooms);
     const baseCenter = { x: baseBounds.x + baseBounds.w/2, y: baseBounds.y + baseBounds.h/2 };
 

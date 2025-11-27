@@ -28,3 +28,5 @@ export interface Selection {
 export type DesignStyle = 'Modern' | 'Rustic' | 'Creative';
 
 export type UnitSystem = 'metric' | 'imperial';
+
+export type RightPanelType = 'library' | 'properties' | 'gallery';

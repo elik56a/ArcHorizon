@@ -1,9 +1,9 @@
 
-import React, { useEffect } from 'react';
-import ChatSidebar from '../components/ChatSidebar';
+import React, { useEffect, useState } from 'react';
+import ChatSidebar from '../components/panels/ChatSidebar';
 import BlueprintCanvas from '../components/blueprint/BlueprintCanvas';
-import RightSidePanel from '../components/RightSidePanel';
-import { Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Layers, CloudCheck } from 'lucide-react';
+import RightSidePanel from '../components/panels/right/RightSidePanel';
+import { Grid, ArrowRight, Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X, Layers, CloudCheck, Image as ImageIcon } from 'lucide-react';
 
 // Stores
 import { useProjectStore } from '../store/useProjectStore';
@@ -16,19 +16,23 @@ export const EditorPage: React.FC = () => {
 
   // State Selectors
   const { 
-      sketchOptions, currentOptionIndex, isGenerating, error, 
-      setCurrentOptionIndex, generateVariation, loadMock, failGeneration 
+      sketchOptions, currentOptionIndex, isGenerating, error, renders,
+      setCurrentOptionIndex, generateVariation, updateSketchMetadata, failGeneration
   } = useProjectStore();
 
   const { 
       leftPanelOpen, rightPanelOpen, bottomPanelOpen, 
-      togglePanel, setPanel 
+      togglePanel, setPanelOpen, setActiveRightPanel
   } = useUiStore();
+
+  // Local State for Title Editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [tempTitle, setTempTitle] = useState('');
 
   // React to generation state to toggle bottom panel
   useEffect(() => {
-      if (isGenerating) setPanel('bottom', false);
-      else if (sketchOptions.some(o => o.status === 'loaded')) setPanel('bottom', true);
+      if (isGenerating) setPanelOpen('bottom', false);
+      else if (sketchOptions.some(o => o.status === 'loaded')) setPanelOpen('bottom', true);
   }, [isGenerating, sketchOptions]);
 
   // Derived State for UI
@@ -40,17 +44,76 @@ export const EditorPage: React.FC = () => {
       
       {/* Editor Toolbar / Sub-Header */}
       <div className="h-12 border-b border-gray-200 bg-white flex items-center px-4 justify-between shrink-0">
-         <div className="flex items-center gap-2">
-             <span className="text-sm font-bold text-gray-500">Project:</span>
-             <span className="text-sm font-bold text-black">{hasLoadedData && currentOption.status === 'loaded' ? currentOption.data.title : 'Untitled Draft'}</span>
+         <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2">
+                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Project</span>
+                 {hasLoadedData && currentOption.status === 'loaded' ? (
+                     isEditingTitle ? (
+                         <input 
+                            autoFocus
+                            type="text"
+                            value={tempTitle}
+                            onChange={(e) => setTempTitle(e.target.value)}
+                            onBlur={() => {
+                                updateSketchMetadata('title', tempTitle);
+                                setIsEditingTitle(false);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    updateSketchMetadata('title', tempTitle);
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                            className="text-sm font-bold text-black border-b border-black outline-none bg-transparent w-64 md:w-[450px]"
+                         />
+                     ) : (
+                        <button 
+                            onClick={() => {
+                                setTempTitle(currentOption.data.title);
+                                setIsEditingTitle(true);
+                            }}
+                            className="text-sm font-bold text-black hover:bg-gray-100 px-2 py-1 rounded transition-colors text-left max-w-[200px] md:max-w-lg truncate"
+                        >
+                            {currentOption.data.title}
+                        </button>
+                     )
+                 ) : (
+                     <span className="text-sm font-bold text-gray-400">Untitled Draft</span>
+                 )}
+             </div>
+             
+             {/* Project Stats */}
+             {hasLoadedData && currentOption.status === 'loaded' && (
+                 <div className="hidden md:flex items-center gap-3 border-l border-gray-200 pl-4 h-6">
+                     <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                        <Layers size={14} className="text-gray-400"/>
+                        <span>{currentOption.data.floors} Floors</span>
+                     </div>
+                     <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                        <Grid size={14} className="text-gray-400"/>
+                        <span>{currentOption.data.totalAreaSqm} m²</span>
+                     </div>
+                 </div>
+             )}
          </div>
          
-         <div className="flex items-center gap-3">
+         <div className="flex items-center gap-4">
              {hasLoadedData && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-400 animate-fade-in select-none">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 select-none">
                     <CloudCheck size={14} className="text-green-500" />
-                    Auto-saved
+                    Saved
                 </div>
+             )}
+             
+             {/* GALLERY BUTTON - Only visible if renders exist */}
+             {renders.length > 0 && (
+                 <button 
+                    onClick={() => { setActiveRightPanel('gallery'); setPanelOpen('right', true); }}
+                    className="flex items-center gap-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-md transition-colors animate-fade-in"
+                 >
+                     <ImageIcon size={14} className="text-purple-600" />
+                     Gallery ({renders.length})
+                 </button>
              )}
          </div>
       </div>
