@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { Logo } from '../components/Logo';
 import { Button, Input, Card } from '../components/common/UIComponents';
@@ -8,8 +8,13 @@ import { ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
-  const { login } = useAuthStore();
+  const { login, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  if (isAuthenticated) {
+      return <Navigate to="/app/dashboard" replace />;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +57,13 @@ export const LoginPage: React.FC = () => {
 
 export const SignupPage: React.FC = () => {
     const navigate = useNavigate();
-    const { login } = useAuthStore();
+    const { login, isAuthenticated } = useAuthStore();
     const [email, setEmail] = useState('');
+
+    // Redirect if already logged in
+    if (isAuthenticated) {
+        return <Navigate to="/app/dashboard" replace />;
+    }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

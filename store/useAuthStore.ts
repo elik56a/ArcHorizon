@@ -1,5 +1,6 @@
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface User {
   id: string;
@@ -17,48 +18,38 @@ interface AuthState {
   updateProfile: (data: Partial<User>) => void;
 }
 
-const STORAGE_KEY = 'archorizon_auth_user';
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
 
-// Helper to get initial state from local storage
-const getInitialUser = (): User | null => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : null;
-  } catch (e) {
-    return null;
-  }
-};
+      login: (email: string) => {
+        // Mock Login
+        const mockUser: User = {
+          id: 'u-' + Date.now(),
+          name: email.split('@')[0] || 'Architect',
+          email: email,
+          avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`,
+          plan: 'Pro'
+        };
+        
+        set({ user: mockUser, isAuthenticated: true });
+      },
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: getInitialUser(),
-  isAuthenticated: !!getInitialUser(),
+      logout: () => {
+        set({ user: null, isAuthenticated: false });
+      },
 
-  login: (email: string) => {
-    // Mock Login
-    const mockUser: User = {
-      id: 'u-' + Date.now(),
-      name: email.split('@')[0] || 'Architect',
-      email: email,
-      avatar: `https://api.dicebear.com/7.x/notionists/svg?seed=${email}`,
-      plan: 'Pro'
-    };
-    
-    // Save to local storage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-    
-    set({ user: mockUser, isAuthenticated: true });
-  },
-
-  logout: () => {
-    localStorage.removeItem(STORAGE_KEY);
-    set({ user: null, isAuthenticated: false });
-  },
-
-  updateProfile: (data) => set((state) => {
-    const newUser = state.user ? { ...state.user, ...data } : null;
-    if (newUser) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+      updateProfile: (data) => set((state) => ({
+        user: state.user ? { ...state.user, ...data } : null
+      })),
+    }),
+    {
+      name: 'archorizon-storage', // unique name in localStorage
+      storage: createJSONStorage(() => localStorage),
+      // We only want to persist user and isAuthenticated
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
-    return { user: newUser };
-  })
-}));
+  )
+);

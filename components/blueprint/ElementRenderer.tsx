@@ -22,66 +22,118 @@ export const Render2DElement: React.FC<Render2DProps> = ({ el, isSelected }) => 
 
     switch (el.type) {
         case 'wall_opening':
-            // Just a hole in the wall. 
-            // Draw a mask to hide the black wall line.
-            // h is the thickness. Mask should be slightly larger than h.
             const maskDepth = h + 10; 
             const maskOffset = (maskDepth - h) / 2;
             return (
                 <g>
-                    {/* Mask */}
                     <rect x={-2} y={-maskOffset} width={w + 4} height={maskDepth} fill="white" stroke="none" />
-                    {/* Dashed Lines indicating beam/zone transition */}
+                    {/* Beam / Threshold Lines */}
                     <line x1={0} y1={0} x2={w} y2={0} stroke="#ccc" strokeWidth={1} strokeDasharray="4,4" />
                     <line x1={0} y1={h} x2={w} y2={h} stroke="#ccc" strokeWidth={1} strokeDasharray="4,4" />
                 </g>
             );
 
         case 'window':
-            // h is the window thickness (e.g. 22cm for 25cm wall).
-            // Wall is thicker than window by 2*FRAME_THICKNESS (3cm).
-            // We need a mask that covers the FULL wall thickness to cut the wall lines.
-            // Mask Height = h + 2*FRAME_THICKNESS + epsilon.
             const fullWallThickness = h + (FRAME_THICKNESS * 2);
-            const winMaskDepth = fullWallThickness + 2; // +2 for clean cut overlap
+            const winMaskDepth = fullWallThickness + 2;
             const winMaskOffset = (winMaskDepth - h) / 2;
             
             return (
                 <g>
-                    {/* 1. White Mask to cut the Wall Lines */}
+                    {/* Mask */}
                     <rect x={-2} y={-winMaskOffset} width={w + 4} height={winMaskDepth} fill="white" stroke="none" />
-                    
-                    {/* 2. The Window Frame Box (Recessed) */}
+                    {/* Frame */}
                     <rect x={0} y={0} width={w} height={h} fill="white" stroke="black" strokeWidth={1.5} />
-                    
-                    {/* 3. Glass Line (Centered) */}
+                    {/* Glass - Centered */}
                     <line x1={0} y1={h/2} x2={w} y2={h/2} stroke="black" strokeWidth={0.5} />
-                    
-                    {/* 4. Optional: Side Frame indicators (filled rects) */}
-                    {/* <rect x={0} y={0} width={4} height={h} fill="black" />
-                    <rect x={w-4} y={0} width={4} height={h} fill="black" /> */}
+                    {/* Side Indicators */}
+                    <rect x={0} y={0} width={3} height={h} fill="black" />
+                    <rect x={w-3} y={0} width={3} height={h} fill="black" />
                 </g>
             );
 
         case 'entry_door':
+            // Mask
+            const entryMaskH = h + 10; 
+            const entryMaskY = -(entryMaskH - h)/2;
             return (
                 <g>
-                    <rect x={-1} y={0} width={w+2} height={h} fill="white" stroke="none" />
-                    <path d={`M 0 ${h} A ${w} ${w} 0 0 1 ${w} 0`} fill="none" stroke={stroke} strokeWidth={detailStroke} />
-                    <rect x={0} y={h-6} width={w} height={6} fill="black" transform={`rotate(-90 0 ${h})`} />
-                    {/* Main Entry Marker Triangle */}
-                    <path d={`M ${w/2 - 15} ${h + 10} L ${w/2 + 15} ${h + 10} L ${w/2} ${h + 35} Z`} fill="black" stroke="none" />
+                    <rect x={-5} y={entryMaskY} width={w+10} height={entryMaskH} fill="white" stroke="none" />
+                    {/* Door Leaf */}
+                    <rect x={0} y={0} width={5} height={w} fill="white" stroke={stroke} strokeWidth={strokeWidth} />
+                    {/* Swing Arc */}
+                    <path d={`M 5 ${w} A ${w} ${w} 0 0 0 ${w} ${5}`} fill="none" stroke={stroke} strokeWidth={detailStroke} strokeDasharray="4,4" />
+                    
+                    {/* Main Entry Marker - Enhanced Arrow */}
+                    <path d={`M ${w/2} -30 L ${w/2 - 10} -45 L ${w/2 + 10} -45 Z`} fill="black" stroke="none" />
                 </g>
             );
 
         case 'door':
+        case 'door_internal' as any:
+        case 'internal_door' as any:
+            const doorMaskH = h + 10; 
+            const doorMaskY = -(doorMaskH - h)/2;
             return (
                 <g>
-                    <rect x={-1} y={0} width={w+2} height={h} fill="white" stroke="none" />
-                    <path d={`M 0 ${h} A ${w} ${w} 0 0 1 ${w} 0`} fill="none" stroke={stroke} strokeWidth={detailStroke} strokeDasharray="4,4" />
-                    <line x1={0} y={h} x2={w} y2={0} stroke={stroke} strokeWidth={strokeWidth} />
-                    <rect x={0} y={0} width={4} height={h} fill="white" stroke="black" strokeWidth={1}/> 
-                    <rect x={w-4} y={0} width={4} height={h} fill="white" stroke="black" strokeWidth={1}/>
+                    <rect x={-5} y={doorMaskY} width={w+10} height={doorMaskH} fill="white" stroke="none" />
+                    <rect x={0} y={0} width={5} height={w} fill="white" stroke={stroke} strokeWidth={strokeWidth} />
+                    <path d={`M 5 ${w} A ${w} ${w} 0 0 0 ${w} ${5}`} fill="none" stroke={stroke} strokeWidth={detailStroke} />
+                </g>
+            );
+
+        case 'sliding_door':
+             const slideMaskH = h + 10;
+             const slideMaskY = -(slideMaskH - h)/2;
+             return (
+                 <g>
+                    <rect x={-5} y={slideMaskY} width={w+10} height={slideMaskH} fill="white" stroke="none" />
+                    <line x1={0} y1={h/2} x2={w} y2={h/2} stroke={stroke} strokeWidth={0.5} />
+                    <rect x={0} y={h/2 - 3} width={w/2 + 5} height={6} fill="white" stroke={stroke} strokeWidth={1.5} />
+                    <rect x={w/2 - 5} y={h/2 - 3} width={w/2 + 5} height={6} fill="white" stroke={stroke} strokeWidth={1.5} transform={`translate(0, ${h > 10 ? 6 : 2})`} />
+                 </g>
+             );
+        
+        case 'stairs':
+        case 'stairs_up':
+        case 'stairs_down':
+            const isUp = el.type !== 'stairs_down';
+            const numSteps = 12; 
+            const isHorizontal = w > h;
+            
+            return (
+                <g>
+                    {/* Outline */}
+                    <rect x={0} y={0} width={w} height={h} fill="white" stroke={stroke} strokeWidth={strokeWidth} />
+                    
+                    {/* Treads */}
+                    {Array.from({length: numSteps}).map((_, i) => {
+                         if (isHorizontal) {
+                             return <line key={i} x1={i * (w/numSteps)} y1={0} x2={i * (w/numSteps)} y2={h} stroke={stroke} strokeWidth={1} opacity={0.5} />
+                         } else {
+                             return <line key={i} x1={0} y1={i * (h/numSteps)} x2={w} y2={i * (h/numSteps)} stroke={stroke} strokeWidth={1} opacity={0.5} />
+                         }
+                    })}
+
+                    {/* Direction Arrow */}
+                     <defs>
+                        <marker id={`arrow-${el.id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                            <path d="M0,0 L6,3 L0,6 L0,0" fill={stroke} />
+                        </marker>
+                         <marker id={`dot-${el.id}`} markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+                            <circle cx="3" cy="3" r="2" fill={stroke} />
+                        </marker>
+                    </defs>
+                    
+                    {isHorizontal ? (
+                         <line x1={w*0.1} y1={h/2} x2={w*0.9} y2={h/2} stroke={stroke} strokeWidth={1.5} markerEnd={`url(#arrow-${el.id})`} markerStart={`url(#dot-${el.id})`} />
+                    ) : (
+                         <line x1={w/2} y1={h*0.1} x2={w/2} y2={h*0.9} stroke={stroke} strokeWidth={1.5} markerEnd={`url(#arrow-${el.id})`} markerStart={`url(#dot-${el.id})`} />
+                    )}
+                    
+                    <text x={w/2} y={h/2} fontSize={10} fontFamily="sans-serif" fontWeight="bold" fill={stroke} textAnchor="middle" dy={isHorizontal ? -10 : 0} dx={isHorizontal ? 0 : 10}>
+                        {isUp ? 'UP' : 'DN'}
+                    </text>
                 </g>
             );
 
@@ -164,7 +216,7 @@ export const Render2DElement: React.FC<Render2DProps> = ({ el, isSelected }) => 
             return (
                 <g>
                     <rect x={0} y={0} width={w} height={h} fill="white" stroke={stroke} strokeWidth={strokeWidth} />
-                    <line x1={0} y1={0} x2={w} y2={h} stroke={stroke} strokeWidth={detailStroke} opacity={0.3} />
+                    <line x1={0} y={0} x2={w} y2={h} stroke={stroke} strokeWidth={detailStroke} opacity={0.3} />
                     <line x1={w} y1={0} x2={0} y2={h} stroke={stroke} strokeWidth={detailStroke} opacity={0.3} />
                 </g>
             );
@@ -184,23 +236,17 @@ export const Render3DElement: React.FC<Render3DProps> = ({ el, color }) => {
     
     switch (type) {
         case 'wall_opening':
-            // Invisible in 3D scene, just creates a hole via Canvas3D logic
             return null;
 
         case 'window':
-            // h is thickness (e.g. 22cm). 
-            // Wall hole logic in Canvas3D ensures the hole matches width (length).
-            // We render the window centered in that hole.
             return (
                 <group position={[0, 110, 0]}>
-                     {/* Frame - Exactly the thickness of the window object */}
                      <mesh>
-                        <boxGeometry args={[w + 2, 110, h]} />
+                        <boxGeometry args={[w, 110, h]} />
                         <meshStandardMaterial color="#111" />
                      </mesh>
-                     {/* Glass */}
                     <mesh>
-                        <boxGeometry args={[w, 100, 2]} />
+                        <boxGeometry args={[w - 4, 100, 2]} />
                         <meshPhysicalMaterial color="#88ccff" roughness={0} transmission={0.6} transparent opacity={0.4} />
                     </mesh>
                 </group>
@@ -225,6 +271,8 @@ export const Render3DElement: React.FC<Render3DProps> = ({ el, color }) => {
              );
         
         case 'door':
+        case 'door_internal' as any:
+        case 'internal_door' as any:
             return (
                <group position={[0, 100, 0]}>
                    <mesh>
@@ -238,6 +286,49 @@ export const Render3DElement: React.FC<Render3DProps> = ({ el, color }) => {
                </group>
             );
         
+        case 'stairs':
+        case 'stairs_up':
+        case 'stairs_down':
+             const stepCount = 14;
+             const floorHeight = 280; 
+             const rise = floorHeight / stepCount;
+             const isUp3D = type !== 'stairs_down';
+             const isHorz = w > h;
+             const run = isHorz ? w / stepCount : h / stepCount;
+             const stepW = isHorz ? h : w; 
+
+             return (
+                 <group position={[0, 0, 0]}>
+                     {Array.from({length: stepCount}).map((_, i) => {
+                         const yPos = (i * rise) + (rise/2); 
+                         let xPos = 0, zPos = 0;
+                         let boxArgs: [number, number, number] = [0,0,0];
+
+                         if (isHorz) {
+                             // Run along X
+                             const stepX = isUp3D ? (-w/2 + (i*run) + run/2) : (w/2 - (i*run) - run/2);
+                             xPos = stepX;
+                             zPos = 0;
+                             boxArgs = [run, rise, stepW];
+                         } else {
+                             // Run along Z
+                             const stepZ = isUp3D ? (-h/2 + (i*run) + run/2) : (h/2 - (i*run) - run/2);
+                             xPos = 0;
+                             zPos = stepZ;
+                             boxArgs = [stepW, rise, run];
+                         }
+
+                         return (
+                             <mesh key={i} position={[xPos, yPos, zPos]} receiveShadow castShadow>
+                                 <boxGeometry args={boxArgs} />
+                                 <meshStandardMaterial color="#e2e8f0" />
+                                 <Edges color="#94a3b8" />
+                             </mesh>
+                         )
+                     })}
+                 </group>
+             );
+
         case 'pool':
              return (
                 <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -20, 0]}>
@@ -333,4 +424,4 @@ export const Render3DElement: React.FC<Render3DProps> = ({ el, color }) => {
                  </mesh>
              );
     }
-}
+};

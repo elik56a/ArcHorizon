@@ -1,9 +1,8 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SketchData, Room, ArchitecturalElement } from '../../types';
 import { useProjectStore } from '../../store/useProjectStore';
 import { Render2DElement } from './ElementRenderer';
-import { isExteriorWall } from '../../services/geometryEngine';
 
 // PHYSICS-BASED RENDERING CONSTANTS (Units = CM)
 const WALL_THICKNESS_EXT = 25; 
@@ -50,7 +49,7 @@ const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, v
             const inches = Math.round((totalFeet - feet) * 12);
             return `${feet}'${inches}"`;
         }
-        return (cm / 100).toFixed(2); // Just number for chains
+        return (cm / 100).toFixed(2);
     };
 
     return (
@@ -69,71 +68,145 @@ const DimensionLine: React.FC<{x1: number, y1: number, x2: number, y2: number, v
     );
 };
 
-// --- COMPONENT: SMART ARCHITECTURAL WALL ---
-// Renders 4 separate polygons to handle variable thickness correctly
-const SmartWall: React.FC<{ room: Room, elements: ArchitecturalElement[], allRooms: Room[] }> = ({ room, elements, allRooms }) => {
-    
-    const isExtN = isExteriorWall(room, 'north', allRooms);
-    const isExtS = isExteriorWall(room, 'south', allRooms);
-    const isExtW = isExteriorWall(room, 'west', allRooms);
-    const isExtE = isExteriorWall(room, 'east', allRooms);
+// --- COMPONENT: GLOBAL WALL RENDERER ---
+// Merges all adjacent room walls into a single set of segments to prevent double-drawing
+interface WallSegment {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    thickness: number;
+    isVertical: boolean;
+}
 
-    const tN = isExtN ? WALL_THICKNESS_EXT : WALL_THICKNESS_INT;
-    const tS = isExtS ? WALL_THICKNESS_EXT : WALL_THICKNESS_INT;
-    const tW = isExtW ? WALL_THICKNESS_EXT : WALL_THICKNESS_INT;
-    const tE = isExtE ? WALL_THICKNESS_EXT : WALL_THICKNESS_INT;
+const GlobalWallRenderer: React.FC<{ rooms: Room[] }> = ({ rooms }) => {
+    const segments = useMemo(() => {
+        const verticalLines: { x: number, y1: number, y2: number }[] = [];
+        const horizontalLines: { y: number, x1: number, x2: number }[] = [];
 
-    // Helper to check if center of wall is obstructed by window/door
-    const isObstructed = (wall: 'n' | 's' | 'w' | 'e') => {
-        const cx = room.x + room.width/2;
-        const cy = room.y + room.height/2;
-        return elements.some(el => {
-            if (el.roomId !== room.id) return false;
-            const elCx = el.x + el.width/2;
-            const elCy = el.y + el.height/2;
-            if (wall === 'n') return Math.abs(el.y - room.y) < 20 && Math.abs(elCx - cx) < 60;
-            if (wall === 's') return Math.abs(el.y - (room.y + room.height)) < 20 && Math.abs(elCx - cx) < 60;
-            if (wall === 'w') return Math.abs(el.x - room.x) < 20 && Math.abs(elCy - cy) < 60;
-            if (wall === 'e') return Math.abs(el.x - (room.x + room.width)) < 20 && Math.abs(elCy - cy) < 60;
-            return false;
+        // 1. Collect all raw edges
+        rooms.forEach(r => {
+            // West & East
+            verticalLines.push({ x: r.x, y1: r.y, y2: r.y + r.height });
+            verticalLines.push({ x: r.x + r.width, y1: r.y, y2: r.y + r.height });
+            // North & South
+            horizontalLines.push({ y: r.y, x1: r.x, x2: r.x + r.width });
+            horizontalLines.push({ y: r.y + r.height, x1: r.x, x2: r.x + r.width });
         });
-    };
 
-    // Generate Path Data for "Ring" Style (Double Line Wall)
-    // Using fill-rule="evenodd" to create a hole
-    const outerPath = `M 0 0 H ${room.width} V ${room.height} H 0 Z`;
-    const innerPath = `M ${tW} ${tN} H ${room.width - tE} V ${room.height - tS} H ${tW} Z`;
+        const finalSegments: WallSegment[] = [];
+        const TOLERANCE = 2;
 
+        // Helper to process lines (Scanline Algorithm)
+        const processLines = (lines: { pos: number, start: number, end: number }[], isVertical: boolean) => {
+            // Group by position (X for vert, Y for horz)
+            const groups: Record<number, number[]> = {};
+            lines.forEach(l => {
+                // Snap to grid/tolerance to group effectively
+                const key = Math.round(l.pos); 
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(l.start);
+                groups[key].push(l.end);
+            });
+
+            Object.entries(groups).forEach(([posKey, points]) => {
+                const pos = Number(posKey);
+                const uniquePoints = Array.from(new Set(points)).sort((a, b) => a - b);
+                
+                // Iterate through intervals defined by unique points
+                for (let i = 0; i < uniquePoints.length - 1; i++) {
+                    const start = uniquePoints[i];
+                    const end = uniquePoints[i+1];
+                    const mid = (start + end) / 2;
+                    
+                    if (end - start < 1) continue; // Skip tiny fragments
+
+                    // Check how many rooms claim this segment edge
+                    let count = 0;
+                    rooms.forEach(r => {
+                        // Use a small buffer to detect occupancy
+                        const buffer = 5;
+                        if (isVertical) {
+                            // Check if this X corresponds to a Left or Right edge of Room R
+                            // AND if the Y-interval is within Room R's Y-range
+                            const onLeft = Math.abs(r.x - pos) < TOLERANCE;
+                            const onRight = Math.abs((r.x + r.width) - pos) < TOLERANCE;
+                            const inY = mid > r.y - buffer && mid < r.y + r.height + buffer;
+                            if ((onLeft || onRight) && inY) count++;
+                        } else {
+                            const onTop = Math.abs(r.y - pos) < TOLERANCE;
+                            const onBottom = Math.abs((r.y + r.height) - pos) < TOLERANCE;
+                            const inX = mid > r.x - buffer && mid < r.x + r.width + buffer;
+                            if ((onTop || onBottom) && inX) count++;
+                        }
+                    });
+
+                    if (count > 0) {
+                        const thickness = count >= 2 ? WALL_THICKNESS_INT : WALL_THICKNESS_EXT;
+                        finalSegments.push({
+                            x1: isVertical ? pos : start,
+                            y1: isVertical ? start : pos,
+                            x2: isVertical ? pos : end,
+                            y2: isVertical ? end : pos,
+                            thickness,
+                            isVertical
+                        });
+                    }
+                }
+            });
+        };
+
+        processLines(verticalLines.map(l => ({ pos: l.x, start: l.y1, end: l.y2 })), true);
+        processLines(horizontalLines.map(l => ({ pos: l.y, start: l.x1, end: l.x2 })), false);
+
+        return finalSegments;
+    }, [rooms]);
+
+    // Render two passes: Black Base, then White Inset
     return (
         <g pointerEvents="none">
-            {/* The Wall "Ring" - White Body, Black Edges */}
-            <path 
-                d={`${outerPath} ${innerPath}`} 
-                fillRule="evenodd" 
-                fill="white" 
-                stroke="black" 
-                strokeWidth={2} 
-                vectorEffect="non-scaling-stroke"
-            />
-
-            {/* Thickness Labels */}
-            {/* Only show if room is big enough */}
-            {room.width > 100 && (
-                <>
-                    {/* North */}
-                    <text x={isObstructed('n') ? room.width * 0.75 : room.width * 0.5} y={tN/2 + 1} textAnchor="middle" dominantBaseline="middle" fontSize={8} fill="black" fontWeight="bold" className="select-none pointer-events-none">{tN}</text>
-                    {/* South */}
-                    <text x={isObstructed('s') ? room.width * 0.25 : room.width * 0.5} y={room.height - tS/2 + 1} textAnchor="middle" dominantBaseline="middle" fontSize={8} fill="black" fontWeight="bold" className="select-none pointer-events-none">{tS}</text>
-                </>
-            )}
-            {room.height > 100 && (
-                <>
-                    {/* West */}
-                    <text x={tW/2} y={isObstructed('w') ? room.height * 0.75 : room.height * 0.5} textAnchor="middle" dominantBaseline="middle" fontSize={8} fill="black" fontWeight="bold" transform={`rotate(-90 ${tW/2} ${isObstructed('w') ? room.height * 0.75 : room.height * 0.5})`} className="select-none pointer-events-none">{tW}</text>
-                    {/* East */}
-                    <text x={room.width - tE/2} y={isObstructed('e') ? room.height * 0.25 : room.height * 0.5} textAnchor="middle" dominantBaseline="middle" fontSize={8} fill="black" fontWeight="bold" transform={`rotate(-90 ${room.width - tE/2} ${isObstructed('e') ? room.height * 0.25 : room.height * 0.5})`} className="select-none pointer-events-none">{tE}</text>
-                </>
-            )}
+            {/* Pass 1: Black Base (Full Thickness) */}
+            {segments.map((seg, i) => (
+                <line 
+                    key={`base-${i}`}
+                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
+                    stroke="black"
+                    strokeWidth={seg.thickness}
+                    strokeLinecap="square"
+                />
+            ))}
+            {/* Pass 2: White Inset (Thickness - 3px for border) */}
+            {segments.map((seg, i) => (
+                <line 
+                    key={`inset-${i}`}
+                    x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
+                    stroke="white"
+                    strokeWidth={Math.max(0, seg.thickness - 3)} // 1.5px border on each side
+                    strokeLinecap="square"
+                />
+            ))}
+            
+            {/* Labels for Thickness */}
+            {segments.map((seg, i) => {
+                if (Math.abs(seg.x2 - seg.x1) < 50 && Math.abs(seg.y2 - seg.y1) < 50) return null; // Skip short walls
+                const mx = (seg.x1 + seg.x2) / 2;
+                const my = (seg.y1 + seg.y2) / 2;
+                return (
+                    <text 
+                        key={`lbl-${i}`}
+                        x={mx} 
+                        y={my} 
+                        fontSize={8} 
+                        fontWeight="bold" 
+                        textAnchor="middle" 
+                        dominantBaseline="middle"
+                        transform={seg.isVertical ? `rotate(-90 ${mx} ${my})` : undefined}
+                        fill="black"
+                    >
+                        {seg.thickness}
+                    </text>
+                );
+            })}
         </g>
     );
 };
@@ -142,7 +215,6 @@ const SmartWall: React.FC<{ room: Room, elements: ArchitecturalElement[], allRoo
 const GlobalDimensionChains: React.FC<{ rooms: Room[], unitSystem: any }> = ({ rooms, unitSystem }) => {
     if (rooms.length === 0) return null;
 
-    // 1. Get Grid Lines
     const xLines = new Set<number>();
     const yLines = new Set<number>();
     rooms.forEach(r => {
@@ -155,42 +227,35 @@ const GlobalDimensionChains: React.FC<{ rooms: Room[], unitSystem: any }> = ({ r
     const sortedX = Array.from(xLines).sort((a,b) => a-b);
     const sortedY = Array.from(yLines).sort((a,b) => a-b);
 
-    // Filter close lines (snap tolerance)
     const cleanX = sortedX.filter((x, i) => i === 0 || x - sortedX[i-1] > 20);
     const cleanY = sortedY.filter((y, i) => i === 0 || y - sortedY[i-1] > 20);
 
     const minX = cleanX[0];
-    const maxX = cleanX[cleanX.length-1];
     const minY = cleanY[0];
-    const maxY = cleanY[cleanY.length-1];
 
     const TOP_OFFSET = minY - 60;
     const LEFT_OFFSET = minX - 60;
 
     return (
         <g pointerEvents="none">
-            {/* Top Chain */}
             {cleanX.map((x, i) => {
                 if (i === cleanX.length - 1) return null;
                 const nextX = cleanX[i+1];
                 return (
                     <React.Fragment key={`dim-x-${i}`}>
                         <DimensionLine x1={x} y1={TOP_OFFSET} x2={nextX} y2={TOP_OFFSET} value={nextX - x} offset={0} unitSystem={unitSystem} isChain />
-                        {/* Tick Lines extending to building */}
                         <line x1={x} y1={TOP_OFFSET} x2={x} y2={minY} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="4,4" />
                         {i === cleanX.length - 2 && <line x1={nextX} y1={TOP_OFFSET} x2={nextX} y2={minY} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="4,4" />}
                     </React.Fragment>
                 );
             })}
 
-            {/* Left Chain */}
             {cleanY.map((y, i) => {
                 if (i === cleanY.length - 1) return null;
                 const nextY = cleanY[i+1];
                 return (
                     <React.Fragment key={`dim-y-${i}`}>
                         <DimensionLine x1={LEFT_OFFSET} y1={y} x2={LEFT_OFFSET} y2={nextY} value={nextY - y} offset={0} unitSystem={unitSystem} isChain />
-                        {/* Tick Lines */}
                         <line x1={LEFT_OFFSET} y1={y} x2={minX} y2={y} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="4,4" />
                         {i === cleanY.length - 2 && <line x1={LEFT_OFFSET} y1={nextY} x2={minX} y2={nextY} stroke="#e5e7eb" strokeWidth={1} strokeDasharray="4,4" />}
                     </React.Fragment>
@@ -236,6 +301,10 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
       return `${Math.round(areaSqm)}m²`;
   };
 
+  // Separate functional rooms from landscape
+  const builtRooms = visibleRooms.filter(r => !['garden', 'parking', 'pool'].includes(r.type));
+  const landscapeRooms = visibleRooms.filter(r => ['garden', 'parking', 'pool'].includes(r.type));
+
   return (
       <svg
           ref={svgRef}
@@ -256,8 +325,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
           <g transform={`translate(${pan.x}, ${pan.y}) rotate(${rotation}) scale(${scale})`}>
             <rect x="-50000" y="-50000" width="100000" height="100000" fill="url(#grid)" />
 
-            {/* Global Dimensions */}
-            <GlobalDimensionChains rooms={visibleRooms.filter(r => !['garden', 'parking', 'pool'].includes(r.type))} unitSystem={unitSystem} />
+            <GlobalDimensionChains rooms={builtRooms} unitSystem={unitSystem} />
 
             {/* LAYER 1: FLOORS (Background Colors) */}
             {visibleRooms.map((room) => {
@@ -266,30 +334,27 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                if (room.type === 'pool') fill = "#ecfeff";
                if (room.type === 'parking') fill = "#f9fafb";
                return (
-                <g key={`floor-${room.id}`} transform={`translate(${room.x}, ${room.y})`}>
+                <g 
+                    key={`floor-${room.id}`} 
+                    transform={`translate(${room.x}, ${room.y})`}
+                    onMouseDown={(e) => { e.preventDefault(); onMouseDown(e, room.id, 'room', room.x, room.y); }}
+                >
                     <rect width={room.width} height={room.height} fill={fill} stroke="none" />
                 </g>
             )})}
 
-            {/* LAYER 2: WALLS (Smart Hollow Walls) */}
-            {visibleRooms.map((room) => {
-               if (['garden', 'pool', 'parking'].includes(room.type)) return null;
+            {/* LAYER 2: MERGED WALLS (Global) */}
+            <GlobalWallRenderer rooms={builtRooms} />
+
+            {/* LAYER 3: ROOM LABELS (Rendered after walls but before elements) */}
+            {builtRooms.map((room) => {
                const isSelected = room.id === selectedId;
                const isSmallRoom = Math.min(room.width, room.height) < 200;
-               const textX = room.labelX !== undefined ? (room.labelX - room.x) : room.width / 2;
-               const textY = room.labelY !== undefined ? (room.labelY - room.y) : room.height / 2;
+               const textX = room.labelX !== undefined ? room.labelX : room.x + room.width / 2;
+               const textY = room.labelY !== undefined ? room.labelY : room.y + room.height / 2;
 
                return (
-                <g
-                  key={`wall-${room.id}`}
-                  transform={`translate(${room.x}, ${room.y})`}
-                  onMouseDown={(e) => { e.preventDefault(); onMouseDown(e, room.id, 'room', room.x, room.y); }}
-                  style={{ cursor: isSelected ? "move" : "pointer" }}
-                >
-                  {/* Replaced simple Wall with SmartWall that handles thickness */}
-                  <SmartWall room={room} elements={visibleElements} allRooms={data.rooms.filter(r => r.floor === activeFloor)} />
-
-                  {/* Room Label */}
+                <g key={`label-${room.id}`}>
                   <g transform={`translate(${textX}, ${textY})`}>
                         <text y={isSmallRoom ? 5 : -5} textAnchor="middle" fontSize={ROOM_LABEL_SIZE} fontWeight="bold" fill="black" className="uppercase pointer-events-none font-mono tracking-widest">
                         {room.name}
@@ -300,14 +365,15 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                             </text>
                         )}
                   </g>
-
-                  {/* Hit Area */}
-                  <rect width={room.width} height={room.height} fill="transparent" stroke="none" />
-                  {isSelected && <ResizeHandles width={room.width} height={room.height} onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}/>}
+                  {isSelected && (
+                      <g transform={`translate(${room.x}, ${room.y})`}>
+                         <ResizeHandles width={room.width} height={room.height} onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}/>
+                      </g>
+                  )}
                 </g>
             )})}
 
-            {/* LAYER 3: ELEMENTS (Windows/Doors cut the walls) */}
+            {/* LAYER 4: ELEMENTS (Windows/Doors cut the walls) */}
             {visibleElements.map((el) => {
                const isSelected = el.id === selectedId;
                return (

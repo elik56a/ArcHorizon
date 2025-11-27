@@ -8,6 +8,9 @@ import { Compass } from 'lucide-react';
 import Canvas3D from './Canvas3D';
 import Canvas2D from './Canvas2D';
 import { ViewportHeader, ViewportToolbar, FloorSelector } from './BlueprintControls';
+import { Canvas } from '@react-three/fiber';
+import { Environment } from '@react-three/drei';
+import { RotatingHouse } from '../landing/RotatingHouse';
 
 // Loading Overlay remains internal to this component as it's visual only
 const LoadingOverlay: React.FC = () => {
@@ -21,11 +24,24 @@ const LoadingOverlay: React.FC = () => {
         <div className="absolute inset-0 z-50 bg-white flex flex-col items-center justify-center select-none">
             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
             <div className="relative z-10 bg-white p-8 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center max-w-md w-full">
-                <div className="w-16 h-16 border-4 border-t-black border-gray-200 rounded-full animate-spin mb-6"></div>
-                <h3 className="text-xl font-black font-mono uppercase tracking-tighter mb-2">PROCESSING BLUEPRINT</h3>
-                <div className="w-full h-2 bg-gray-100 border border-black mb-4 overflow-hidden">
-                    <div className="h-full bg-black animate-[progress_2s_ease-in-out_infinite]" style={{ width: '30%' }}></div>
+                
+                {/* 3D Spinner Replacement */}
+                <div className="w-48 h-48 mb-2">
+                    <Canvas camera={{ position: [4, 3, 4], fov: 45 }}>
+                         <ambientLight intensity={0.8} />
+                         <directionalLight position={[2, 5, 2]} />
+                         <RotatingHouse />
+                         <Environment preset="city" />
+                    </Canvas>
                 </div>
+
+                <h3 className="text-xl font-black font-mono uppercase tracking-tighter mb-2">PROCESSING BLUEPRINT</h3>
+                
+                {/* Animated Progress Bar */}
+                <div className="w-full h-2 bg-gray-100 border border-black mb-4 overflow-hidden relative">
+                    <div className="absolute top-0 bottom-0 left-0 w-full bg-black animate-progress origin-left"></div>
+                </div>
+                
                 <p className="text-xs font-mono font-bold text-gray-500 animate-pulse">{STEPS[step]}</p>
             </div>
         </div>
@@ -89,6 +105,13 @@ const BlueprintCanvas: React.FC = () => {
         cameraStateRef.current = null;
     }
   }, [data?.id]);
+
+  // Auto-fit when switching active floor in 2D to ensure visibility
+  useEffect(() => {
+      if (viewMode === '2d') {
+          fitToScreen(activeFloor);
+      }
+  }, [activeFloor]);
 
   // Logic to handle view mode switching
   useEffect(() => { 

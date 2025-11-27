@@ -262,6 +262,20 @@ const SceneSetup = ({ data, activeFloor, showAllFloors, cameraStateRef }: SceneS
   return null;
 };
 
+// Controls the camera target height when switching floors
+const FloorCameraController = ({ activeFloor, showAllFloors }: { activeFloor: number, showAllFloors: boolean }) => {
+    const controls = useThree((state) => state.controls);
+    useEffect(() => {
+        if (!controls || showAllFloors) return;
+        const targetY = (activeFloor - 1) * FLOOR_PITCH;
+        // @ts-ignore
+        controls.target.setY(targetY);
+        // @ts-ignore
+        controls.update();
+    }, [activeFloor, showAllFloors, controls]);
+    return null;
+};
+
 const Canvas3D: React.FC<any> = ({ data, activeFloor, showAllFloors = false, onUpdate, cameraStateRef }) => {
   const visibleRooms = showAllFloors ? data.rooms : data.rooms.filter((r:any) => r.floor === activeFloor);
   const visibleElements = showAllFloors ? data.elements : data.elements.filter((e:any) => e.floor === activeFloor);
@@ -272,6 +286,7 @@ const Canvas3D: React.FC<any> = ({ data, activeFloor, showAllFloors = false, onU
         <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 800, 800], fov: 50, near: 1, far: 100000 }} gl={{ antialias: true }}>
            <Suspense fallback={<Html center>LOADING...</Html>}>
                <SceneSetup data={data} activeFloor={activeFloor} showAllFloors={showAllFloors} cameraStateRef={cameraStateRef}/>
+               <FloorCameraController activeFloor={activeFloor} showAllFloors={showAllFloors} />
                <ambientLight intensity={0.8} />
                <directionalLight position={[3000, 4000, 2000]} intensity={1} castShadow />
                
