@@ -24,11 +24,12 @@ interface InteractionProps {
     currentStroke: { x: number, y: number }[] | null;
     currentOptionIndex: number;
     viewMode: '2d' | '3d';
+    setScale: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export const useCanvasInteraction = ({
     containerRef, localData, setLocalData, activeFloor, scale, rotation, pan, setPan,
-    activeTool, eraserSize, penSize, setCurrentStroke, currentStroke, currentOptionIndex, viewMode
+    activeTool, eraserSize, penSize, setCurrentStroke, currentStroke, currentOptionIndex, viewMode, setScale
 }: InteractionProps) => {
     
     const { 
@@ -44,6 +45,9 @@ export const useCanvasInteraction = ({
     const [resizeState, setResizeState] = useState<ResizeState | null>(null);
     const [hasMoved, setHasMoved] = useState(false);
     const mouseDownPos = useRef<{x: number, y: number} | null>(null);
+    
+    // Pinch Zoom State
+    const [pinchDist, setPinchDist] = useState<number | null>(null);
 
     const getModelCoordinates = (clientX: number, clientY: number) => {
         if (!containerRef.current) return { x: 0, y: 0 };
@@ -57,6 +61,8 @@ export const useCanvasInteraction = ({
         const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
         return { x: rx / scale, y: ry / scale };
     };
+
+    // --- MOUSE HANDLERS ---
 
     const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
         if (viewMode === '3d') return; 
@@ -300,11 +306,91 @@ export const useCanvasInteraction = ({
         setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
     };
 
+    // --- TOUCH HANDLERS ---
+
+    const handleTouchStart = (e: React.TouchEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
+        // Multi-touch = Pinch Start
+        if (e.touches.length === 2) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            setPinchDist(dist);
+            // Cancel any drag/pan that might have started with the first finger
+            setDragState(null);
+            setIsPanning(false);
+            return;
+        }
+
+        // Single touch = Mouse Down Logic
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const fakeEvent = {
+                ...e,
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                button: 0,
+                buttons: 1,
+                preventDefault: () => {},
+                stopPropagation: () => {}
+            } as unknown as React.MouseEvent;
+            
+            handleMouseDown(fakeEvent, id, type, x, y, resizeHandle);
+        }
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        // Pinch Zoom Logic
+        if (e.touches.length === 2 && pinchDist) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const zoomFactor = dist / pinchDist;
+            setScale(prev => Math.min(Math.max(prev * zoomFactor, 0.1), 5));
+            setPinchDist(dist);
+            return;
+        }
+
+        // Single Touch Move
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const fakeEvent = {
+                ...e,
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                button: 0,
+                buttons: 1
+            } as unknown as React.MouseEvent;
+            handleMouseMove(fakeEvent);
+        }
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent) => {
+        setPinchDist(null);
+        // Only trigger mouse up logic if we were not pinching
+        // If touches drops to 0, call mouse up
+        if (e.touches.length === 0) {
+            const touch = e.changedTouches[0];
+            const fakeEvent = {
+                ...e,
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                button: 0,
+                buttons: 0
+            } as unknown as React.MouseEvent;
+            handleMouseUp(fakeEvent);
+        }
+    };
+
     return {
         handleMouseDown,
         handleMouseMove,
         handleMouseUp,
         handleWheel,
+        handleTouchStart,
+        handleTouchMove,
+        handleTouchEnd,
         isPanning,
         dragState,
         resizeState

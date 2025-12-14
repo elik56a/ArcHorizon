@@ -4,7 +4,8 @@ import * as ReactRouterDOM from 'react-router-dom';
 import { useProjectStore } from '../store/useProjectStore';
 import { useTranslation } from '../hooks/useTranslation';
 import { Card, Button } from '../components/common/UIComponents';
-import { Layout, Trash2, ExternalLink, Plus } from 'lucide-react';
+import { ProjectThumbnail } from '../components/common/ProjectThumbnail';
+import { Trash2, Plus } from 'lucide-react';
 
 const { Link } = ReactRouterDOM as any;
 
@@ -28,9 +29,10 @@ export const HistoryPage: React.FC = () => {
           {savedSketches.map((sketch) => (
               <Card key={sketch.id} className="group relative overflow-hidden hover:shadow-md transition-all">
                   {/* Thumbnail Area */}
-                  <div className="h-48 bg-gray-50 border-b border-gray-100 flex items-center justify-center relative">
-                       <Layout size={64} className="text-gray-200" />
-                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
+                  <div className="relative h-48 border-b border-gray-100">
+                       <ProjectThumbnail data={sketch} className="w-full h-full" />
+                       
+                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2 backdrop-blur-[1px]">
                            <Link to="/app/editor" onClick={() => loadSketch(sketch.id)}>
                                <Button variant="secondary" className="shadow-xl">{t('history.openEditor')}</Button>
                            </Link>

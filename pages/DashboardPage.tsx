@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useProjectStore } from '../store/useProjectStore';
 import { useTranslation } from '../hooks/useTranslation';
 import { Card, Button } from '../components/common/UIComponents';
+import { ProjectThumbnail } from '../components/common/ProjectThumbnail';
 import { Plus, FileCode, Clock, ArrowUpRight, Layout, Activity, Database, ChevronRight, TrendingUp, MoreHorizontal } from 'lucide-react';
 
 const { Link } = ReactRouterDOM as any;
@@ -154,15 +155,7 @@ export const DashboardPage: React.FC = () => {
                      <Link to="/app/editor" key={sketch.id} onClick={() => loadSketch(sketch.id)} className="group">
                         <Card className="h-full hover:shadow-md transition-all border-gray-200 group-hover:border-gray-300 cursor-pointer overflow-hidden flex flex-col">
                            {/* Thumbnail */}
-                           <div className="aspect-[4/3] bg-gray-100 relative flex items-center justify-center border-b border-gray-100 overflow-hidden">
-                              <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px] opacity-50"></div>
-                              <Layout size={40} className="text-gray-300 group-hover:scale-110 transition-transform duration-500 relative z-10" />
-                              <div className="absolute top-3 right-3">
-                                  <div className="bg-white/80 backdrop-blur p-1.5 rounded-lg hover:bg-white transition-colors shadow-sm">
-                                      <MoreHorizontal size={14} className="text-gray-500" />
-                                  </div>
-                              </div>
-                           </div>
+                           <ProjectThumbnail data={sketch} className="aspect-[4/3] border-b border-gray-100 group-hover:opacity-90 transition-opacity" />
                            
                            {/* Content */}
                            <div className="p-4 flex-1 flex flex-col">

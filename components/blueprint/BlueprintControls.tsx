@@ -8,7 +8,7 @@ import { useUiStore } from '../../store/useUiStore';
 import { useTranslation } from '../../hooks/useTranslation';
 import { DISCIPLINE_STYLES } from '../../theme';
 
-// --- HELPER: TOOLTIP BUTTON ---
+// --- HELPER: PORTAL TOOLTIP BUTTON ---
 interface TooltipButtonProps {
     onClick: () => void;
     icon: LucideIcon;
@@ -20,27 +20,114 @@ interface TooltipButtonProps {
 }
 
 const TooltipButton: React.FC<TooltipButtonProps> = ({ onClick, icon: Icon, label, disabled, className = "", isActive, hideLabelOnMobile }) => {
+    const [showTooltip, setShowTooltip] = useState(false);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+    const handleMouseEnter = () => {
+        if (buttonRef.current && !disabled) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setCoords({ top: rect.bottom + 8, left: rect.left + rect.width / 2 });
+            setShowTooltip(true);
+        }
+    };
+
     return (
-        <button 
-            onClick={onClick} 
-            disabled={disabled}
-            className={`relative group p-2 rounded-md transition-all flex items-center justify-center h-9 w-9 shrink-0 ${
-                isActive 
-                    ? 'bg-black text-white shadow-md hover:bg-gray-800' 
-                    : (className ? className : 'hover:bg-gray-100 text-gray-600')
-            } ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''}`}
-        >
-            <Icon size={18} className="rtl:scale-x-[-1]"/>
+        <>
+            <button 
+                ref={buttonRef}
+                onClick={onClick} 
+                disabled={disabled}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={() => setShowTooltip(false)}
+                className={`relative group p-2 rounded-md transition-all flex items-center justify-center h-9 w-9 shrink-0 ${
+                    isActive 
+                        ? 'bg-black text-white shadow-md hover:bg-gray-800' 
+                        : (className ? className : 'hover:bg-gray-100 text-gray-600')
+                } ${disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''}`}
+            >
+                <Icon size={18} className="rtl:scale-x-[-1]"/>
+            </button>
             
-            {/* Tooltip Container */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-[200] whitespace-nowrap pointer-events-none">
-                <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative">
-                    {label}
-                    {/* Arrow */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
-                </div>
-            </div>
-        </button>
+            {showTooltip && createPortal(
+                <div 
+                    className="fixed z-[9999] pointer-events-none transform -translate-x-1/2 animate-fade-in"
+                    style={{ top: coords.top, left: coords.left }}
+                >
+                    <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative whitespace-nowrap">
+                        {label}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </>
+    );
+};
+
+// --- HELPER: PORTAL DROPDOWN ---
+const PortalDropdown: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    anchorRef: React.RefObject<HTMLElement>;
+    children: React.ReactNode;
+    className?: string;
+}> = ({ isOpen, onClose, anchorRef, children, className = "" }) => {
+    const [position, setPosition] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        const updatePosition = () => {
+            if (isOpen && anchorRef.current) {
+                const rect = anchorRef.current.getBoundingClientRect();
+                setPosition({
+                    top: rect.bottom + 8,
+                    left: rect.left
+                });
+            }
+        };
+        
+        const handleClickOutside = (event: MouseEvent) => {
+            if (anchorRef.current && !anchorRef.current.contains(event.target as Node)) {
+                // We rely on the dropdown content being a portal, so checking if click is in anchor is not enough
+                // BUT, since the portal is appended to body, event.target will be inside the portal div
+                // We need a ref to the portal content ideally.
+                // However, simplistic check: if click is NOT in anchor, we close. 
+                // Wait, if click is inside the dropdown (portal), we shouldn't close.
+                // It's tricky to detect click inside portal from here without a ref to the portal container.
+                // Let's rely on the parent to handle specific logic or just close on any click that isn't the trigger
+                // For simplicity: We add a transparent backdrop or check closest.
+                
+                // Better approach: Check if target is inside a specific class we add to the portal
+                const target = event.target as HTMLElement;
+                if (!target.closest('.portal-dropdown-content') && !anchorRef.current?.contains(target)) {
+                    onClose();
+                }
+            }
+        };
+
+        if (isOpen) {
+            updatePosition();
+            window.addEventListener('resize', updatePosition);
+            window.addEventListener('scroll', updatePosition, true);
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div 
+            className={`fixed z-[9999] portal-dropdown-content bg-white border border-gray-200 shadow-xl rounded-md p-1 animate-fade-in flex flex-col gap-1 ${className}`}
+            style={{ top: position.top, left: position.left }}
+        >
+            {children}
+        </div>,
+        document.body
     );
 };
 
@@ -56,11 +143,13 @@ interface ThicknessDropdownProps {
 
 const ThicknessDropdown: React.FC<ThicknessDropdownProps> = ({ value, onChange, isOpen, setIsOpen, disabled, activeTool }) => {
     const { t } = useTranslation();
+    const buttonRef = useRef<HTMLButtonElement>(null);
     const options = [2, 4, 6, 8, 10];
     
     return (
         <div className="relative h-full flex items-center">
             <button 
+                ref={buttonRef}
                 onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
                 disabled={disabled}
                 className={`h-full w-5 flex items-center justify-center rounded-e-md border-s transition-colors ${
@@ -72,23 +161,56 @@ const ThicknessDropdown: React.FC<ThicknessDropdownProps> = ({ value, onChange, 
                 <ChevronDown size={10} />
             </button>
             
-            {isOpen && !disabled && (
-                <div className="absolute top-full left-0 rtl:left-auto rtl:right-0 mt-1 bg-white border border-gray-200 shadow-xl rounded-md p-1 min-w-[120px] z-[150] flex flex-col gap-1 animate-fade-in">
-                     <div className="text-[10px] font-bold text-gray-400 px-2 py-1 uppercase tracking-wider text-start">{t('editor.toolbar.thickness')}</div>
-                     {options.map(size => (
-                         <button
-                            key={size}
-                            onClick={() => { onChange(size); setIsOpen(false); }}
-                            className={`flex items-center gap-3 px-2 py-2 hover:bg-gray-50 rounded text-xs w-full text-start group ${value === size ? 'bg-blue-50 text-blue-600' : 'text-gray-700'}`}
-                         >
-                             <div className="w-8 flex justify-center items-center">
-                                <div className={`rounded-full ${value === size ? 'bg-blue-600' : 'bg-gray-400 group-hover:bg-gray-600'}`} style={{ width: size, height: size }}></div>
-                             </div>
-                             <span className="font-mono">{t('editor.toolbar.size', { n: size })}</span>
-                         </button>
-                     ))}
-                </div>
-            )}
+            <PortalDropdown isOpen={isOpen && !disabled} onClose={() => setIsOpen(false)} anchorRef={buttonRef} className="min-w-[120px]">
+                 <div className="text-[10px] font-bold text-gray-400 px-2 py-1 uppercase tracking-wider text-start">{t('editor.toolbar.thickness')}</div>
+                 {options.map(size => (
+                     <button
+                        key={size}
+                        onClick={() => { onChange(size); setIsOpen(false); }}
+                        className={`flex items-center gap-3 px-2 py-2 hover:bg-gray-50 rounded text-xs w-full text-start group ${value === size ? 'bg-blue-50 text-blue-600' : 'text-gray-700'}`}
+                     >
+                         <div className="w-8 flex justify-center items-center">
+                            <div className={`rounded-full ${value === size ? 'bg-blue-600' : 'bg-gray-400 group-hover:bg-gray-600'}`} style={{ width: size, height: size }}></div>
+                         </div>
+                         <span className="font-mono">{t('editor.toolbar.size', { n: size })}</span>
+                     </button>
+                 ))}
+            </PortalDropdown>
+        </div>
+    );
+};
+
+// --- EXPORT MENU ---
+const ExportMenu: React.FC<{ 
+    onDownload: (type: 'svg' | 'pdf' | 'dxf') => void;
+    isLoading?: boolean; 
+}> = ({ onDownload, isLoading }) => {
+    const { t } = useTranslation();
+    const [isOpen, setIsOpen] = useState(false);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    return (
+        <div className={`relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+            <button 
+                ref={buttonRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className="bg-black text-white px-3 md:px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors ml-2 rtl:ml-0 rtl:mr-2 shadow-sm active:scale-95"
+                disabled={isLoading}
+            >
+                <Download size={14} /> <span className="hidden md:inline">{t('editor.toolbar.export')}</span>
+            </button>
+            
+            <PortalDropdown isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={buttonRef} className="min-w-[160px] overflow-hidden rounded-lg p-0">
+                <button onClick={() => { onDownload('svg'); setIsOpen(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2 w-full">
+                    <span className="bg-orange-100 text-orange-600 px-1 rounded text-[10px]">SVG</span> {t('editor.toolbar.svg')}
+                </button>
+                <button onClick={() => { onDownload('pdf'); setIsOpen(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2 w-full">
+                    <span className="bg-red-100 text-red-600 px-1 rounded text-[10px]">PDF</span> {t('editor.toolbar.pdf')}
+                </button>
+                <button onClick={() => { onDownload('dxf'); setIsOpen(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold flex items-center gap-2 w-full">
+                    <span className="bg-blue-100 text-blue-600 px-1 rounded text-[10px]">DXF</span> {t('editor.toolbar.dxf')}
+                </button>
+            </PortalDropdown>
         </div>
     );
 };
@@ -106,64 +228,13 @@ interface LayerSwitcherProps {
 const LayerSwitcher: React.FC<LayerSwitcherProps> = ({ activeLayerId, setActiveLayer, setDiscipline, toggleVisibility, layers, disabled }) => {
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
-    
-    // Refs for Portal Positioning and Click Detection
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ top: 0, left: 0 });
-
     const { setActiveRightPanel, setPanelOpen } = useUiStore();
     
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            // Check if click is inside dropdown OR button
-            if (
-                dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
-                buttonRef.current && !buttonRef.current.contains(event.target as Node)
-            ) {
-                setIsOpen(false);
-            }
-        };
-        
-        // Update position on scroll/resize to keep attached
-        const updatePosition = () => {
-            if (isOpen && buttonRef.current) {
-                const rect = buttonRef.current.getBoundingClientRect();
-                setPosition({
-                    top: rect.bottom + 8,
-                    left: rect.left
-                });
-            }
-        };
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            window.addEventListener('scroll', updatePosition, true);
-            window.addEventListener('resize', updatePosition);
-        }
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            window.removeEventListener('scroll', updatePosition, true);
-            window.removeEventListener('resize', updatePosition);
-        };
-    }, [isOpen]);
-
     const activeLayer = layers.find(l => l.id === activeLayerId);
     const activeDiscipline = activeLayer ? activeLayer.discipline : 'arc';
     const activeStyle = DISCIPLINE_STYLES[activeDiscipline];
     const ActiveIcon = activeStyle.icon;
-
-    const handleToggle = () => {
-        if (!isOpen && buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            setPosition({
-                top: rect.bottom + 8,
-                left: rect.left
-            });
-        }
-        setIsOpen(!isOpen);
-    };
 
     const handleSwitchDiscipline = (d: Discipline) => {
         setDiscipline(d);
@@ -178,7 +249,7 @@ const LayerSwitcher: React.FC<LayerSwitcherProps> = ({ activeLayerId, setActiveL
         <div className="relative mr-2 rtl:mr-0 rtl:ml-2">
             <button 
                 ref={buttonRef}
-                onClick={handleToggle}
+                onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
                 className={`h-10 ps-2 pe-3 flex items-center gap-2 rounded-lg border transition-all ${
                     isOpen 
@@ -198,67 +269,60 @@ const LayerSwitcher: React.FC<LayerSwitcherProps> = ({ activeLayerId, setActiveL
                 <ChevronDown size={14} className={`text-gray-400 ms-2 transition-transform hidden md:block ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {isOpen && !disabled && createPortal(
-                <div 
-                    ref={dropdownRef}
-                    className="fixed w-72 bg-white border border-gray-200 shadow-xl rounded-xl p-2 z-[9999] animate-fade-in flex flex-col gap-1"
-                    style={{ top: position.top, left: position.left }}
-                >
-                    <div className="text-[10px] font-bold text-gray-400 px-2 py-1 uppercase tracking-wider flex justify-between items-center">
-                        <span>Disciplines</span>
-                        <span className="text-[9px] normal-case bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">
-                            {t('editor.toolbar.visibleOnly')}
-                        </span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                        {disciplines.map(disc => {
-                            const style = DISCIPLINE_STYLES[disc];
-                            const Icon = style.icon;
-                            const isActive = disc === activeDiscipline;
-                            const layer = layers.find(l => l.discipline === disc);
-                            const layerId = layer ? layer.id : '';
-                            const isVisible = layer ? layer.isVisible : false;
+            <PortalDropdown isOpen={isOpen && !disabled} onClose={() => setIsOpen(false)} anchorRef={buttonRef} className="w-72 p-2">
+                <div className="text-[10px] font-bold text-gray-400 px-2 py-1 uppercase tracking-wider flex justify-between items-center">
+                    <span>Disciplines</span>
+                    <span className="text-[9px] normal-case bg-gray-100 px-1.5 py-0.5 rounded text-gray-500">
+                        {t('editor.toolbar.visibleOnly')}
+                    </span>
+                </div>
+                
+                <div className="flex flex-col gap-1">
+                    {disciplines.map(disc => {
+                        const style = DISCIPLINE_STYLES[disc];
+                        const Icon = style.icon;
+                        const isActive = disc === activeDiscipline;
+                        const layer = layers.find(l => l.discipline === disc);
+                        const layerId = layer ? layer.id : '';
+                        const isVisible = layer ? layer.isVisible : false;
 
-                            return (
-                                <div key={disc} className={`flex items-center gap-2 p-1.5 rounded-lg transition-all border ${isActive ? `${style.bg} ${style.border}` : 'border-transparent hover:bg-gray-50'}`}>
-                                    {/* Visibility Toggle */}
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); if(layerId) toggleVisibility(layerId); }}
-                                        className={`p-2 rounded-md transition-colors ${isVisible ? 'text-gray-600 hover:text-black hover:bg-white border border-transparent hover:border-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
-                                        title={isVisible ? t('editor.toolbar.hide') : t('editor.toolbar.show')}
-                                        disabled={!layer}
-                                    >
-                                        {isVisible ? <Eye size={16}/> : <EyeOff size={16}/>}
-                                    </button>
+                        return (
+                            <div key={disc} className={`flex items-center gap-2 p-1.5 rounded-lg transition-all border ${isActive ? `${style.bg} ${style.border}` : 'border-transparent hover:bg-gray-50'}`}>
+                                {/* Visibility Toggle */}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); if(layerId) toggleVisibility(layerId); }}
+                                    className={`p-2 rounded-md transition-colors ${isVisible ? 'text-gray-600 hover:text-black hover:bg-white border border-transparent hover:border-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
+                                    title={isVisible ? t('editor.toolbar.hide') : t('editor.toolbar.show')}
+                                    disabled={!layer}
+                                >
+                                    {isVisible ? <Eye size={16}/> : <EyeOff size={16}/>}
+                                </button>
 
-                                    {/* Selection Button */}
-                                    <button 
-                                        onClick={() => handleSwitchDiscipline(disc)}
-                                        className="flex-1 text-start flex items-center gap-3 group"
-                                    >
-                                        <div className={`w-8 h-8 rounded flex items-center justify-center border transition-all ${isActive ? 'bg-white border-white shadow-sm' : 'bg-gray-50 border-gray-100 group-hover:bg-white group-hover:border-gray-200'} ${style.text}`}>
-                                            <Icon size={16} />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className={`text-xs font-bold ${isActive ? style.text : 'text-gray-600 group-hover:text-black'}`}>
-                                                {t(`layers.${disc}`)}
+                                {/* Selection Button */}
+                                <button 
+                                    onClick={() => handleSwitchDiscipline(disc)}
+                                    className="flex-1 text-start flex items-center gap-3 group"
+                                >
+                                    <div className={`w-8 h-8 rounded flex items-center justify-center border transition-all ${isActive ? 'bg-white border-white shadow-sm' : 'bg-gray-50 border-gray-100 group-hover:bg-white group-hover:border-gray-200'} ${style.text}`}>
+                                        <Icon size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className={`text-xs font-bold ${isActive ? style.text : 'text-gray-600 group-hover:text-black'}`}>
+                                            {t(`layers.${disc}`)}
+                                        </span>
+                                        {layer && (
+                                            <span className="text-[9px] text-gray-400 font-mono">
+                                                {t('editor.toolbar.items', { count: layer.elements.length + (layer.rooms?.length || 0) })}
                                             </span>
-                                            {layer && (
-                                                <span className="text-[9px] text-gray-400 font-mono">
-                                                    {t('editor.toolbar.items', { count: layer.elements.length + (layer.rooms?.length || 0) })}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {isActive && <div className="ms-auto me-2"><Check size={14} className={style.text}/></div>}
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>,
-                document.body
-            )}
+                                        )}
+                                    </div>
+                                    {isActive && <div className="ms-auto me-2"><Check size={14} className={style.text}/></div>}
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            </PortalDropdown>
         </div>
     );
 };
@@ -310,7 +374,6 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
     const { t } = useTranslation();
     const { isRendering } = useProjectStore();
     const { setActiveRightPanel, setPanelOpen, activeRightPanel, rightPanelOpen } = useUiStore();
-    const [showExportMenu, setShowExportMenu] = useState(false);
     const [penMenuOpen, setPenMenuOpen] = useState(false);
     const [eraserMenuOpen, setEraserMenuOpen] = useState(false);
 
@@ -353,19 +416,11 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
                     {/* ADD COMPONENT BUTTON */}
                     <button
                         onClick={handleLibraryToggle}
-                        className={`h-10 px-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold text-xs transition-all shadow-sm group mr-2 rtl:mr-0 rtl:ml-2 relative ${isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${activeRightPanel === 'library' && rightPanelOpen ? 'bg-gray-100 border-gray-300 shadow-inner' : ''}`}
+                        className={`relative h-10 px-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold text-xs transition-all shadow-sm group mr-2 rtl:mr-0 rtl:ml-2 relative ${isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${activeRightPanel === 'library' && rightPanelOpen ? 'bg-gray-100 border-gray-300 shadow-inner' : ''}`}
                         disabled={isLoading}
                     >
                         <Plus size={16} className={`transition-transform duration-200 ${activeRightPanel === 'library' && rightPanelOpen ? 'rotate-45 text-black' : 'text-black'}`} />
                         <span className="hidden xl:inline">{t('editor.panels.library')}</span>
-                        
-                        {/* Tooltip */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-[200] whitespace-nowrap pointer-events-none">
-                            <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative">
-                                {t('editor.panels.library')}
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
-                            </div>
-                        </div>
                     </button>
 
                     <div className="w-px h-6 bg-gray-200 mx-1"></div>
@@ -414,8 +469,8 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
                             <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
                             <div className="flex items-center gap-1">
-                                <TooltipButton onClick={() => setActiveTool('select')} icon={MousePointer2} label={t('editor.toolbar.select')} isActive={activeTool === 'select' && !toolsDisabled} disabled={toolsDisabled} />
                                 <TooltipButton onClick={() => setActiveTool('pan')} icon={Hand} label={t('editor.toolbar.pan')} isActive={activeTool === 'pan' && !toolsDisabled} disabled={toolsDisabled} />
+                                <TooltipButton onClick={() => setActiveTool('select')} icon={MousePointer2} label={t('editor.toolbar.select')} isActive={activeTool === 'select' && !toolsDisabled} disabled={toolsDisabled} />
                             </div>
                             
                             <div className="w-px h-6 bg-gray-200 mx-1"></div>
@@ -503,28 +558,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
                         className={`transition-all ${isRendering ? 'bg-indigo-600 text-white animate-pulse' : 'text-indigo-600 hover:bg-indigo-50'}`}
                     />
 
-                    <div className={`relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <button 
-                            onClick={() => setShowExportMenu(!showExportMenu)}
-                            className="bg-black text-white px-3 md:px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors ml-2 rtl:ml-0 rtl:mr-2 shadow-sm active:scale-95"
-                            disabled={isLoading}
-                        >
-                            <Download size={14} /> <span className="hidden md:inline">{t('editor.toolbar.export')}</span>
-                        </button>
-                        {showExportMenu && (
-                            <div className="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-lg flex flex-col min-w-[160px] overflow-hidden z-[150] animate-fade-in">
-                                <button onClick={() => { onDownload('svg'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
-                                    <span className="bg-orange-100 text-orange-600 px-1 rounded text-[10px]">SVG</span> {t('editor.toolbar.svg')}
-                                </button>
-                                <button onClick={() => { onDownload('pdf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
-                                    <span className="bg-red-100 text-red-600 px-1 rounded text-[10px]">PDF</span> {t('editor.toolbar.pdf')}
-                                </button>
-                                <button onClick={() => { onDownload('dxf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold flex items-center gap-2">
-                                    <span className="bg-blue-100 text-blue-600 px-1 rounded text-[10px]">DXF</span> {t('editor.toolbar.dxf')}
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    <ExportMenu onDownload={onDownload} isLoading={isLoading} />
                 </div>
             </div>
         </div>

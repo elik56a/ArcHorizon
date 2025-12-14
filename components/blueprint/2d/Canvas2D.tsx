@@ -19,6 +19,12 @@ interface Canvas2DProps {
   onMouseMove: (e: React.MouseEvent) => void;
   onMouseUp: (e: React.MouseEvent) => void;
   onWheel: (e: React.WheelEvent) => void;
+  
+  // Touch Handlers
+  onTouchStart: (e: React.TouchEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => void;
+  onTouchMove: (e: React.TouchEvent) => void;
+  onTouchEnd: (e: React.TouchEvent) => void;
+
   bounds: { minX: number, maxX: number, minY: number, maxY: number };
   selectedId?: string;
   // Drawing Props
@@ -28,23 +34,11 @@ interface Canvas2DProps {
   eraserSize?: number;
 }
 
-// Helper for touch events
-const toMouse = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    return {
-        ...e,
-        clientX: t ? t.clientX : 0,
-        clientY: t ? t.clientY : 0,
-        button: 0,
-        buttons: 1,
-        preventDefault: () => e.preventDefault(),
-        stopPropagation: () => e.stopPropagation()
-    } as unknown as React.MouseEvent;
-};
-
 const Canvas2D: React.FC<Canvas2DProps> = ({
   svgRef, data, activeFloor, pan, scale, rotation, 
-  onMouseDown, onMouseMove, onMouseUp, onWheel, bounds, selectedId,
+  onMouseDown, onMouseMove, onMouseUp, onWheel, 
+  onTouchStart, onTouchMove, onTouchEnd,
+  bounds, selectedId,
   currentStroke, penSize = 4, activeTool, eraserSize = 10
 }) => {
   const { unitSystem, viewStyle } = useProjectStore();
@@ -108,9 +102,9 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
           onWheel={onWheel}
-          onTouchStart={(e) => onMouseDown(toMouse(e))}
-          onTouchMove={(e) => onMouseMove(toMouse(e))}
-          onTouchEnd={(e) => onMouseUp({ ...e, preventDefault:()=>{}, stopPropagation:()=>{}, buttons: 0 } as any)}
+          onTouchStart={(e) => onTouchStart(e)}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
         >
           <defs>
             <pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse">
@@ -137,8 +131,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     }}
                     onTouchStart={(e) => {
                         if (activeTool !== 'select') return;
-                        // e.preventDefault(); // Prevent scroll?
-                        onMouseDown(toMouse(e), room.id, 'room', room.x, room.y);
+                        onTouchStart(e, room.id, 'room', room.x, room.y);
                     }}
                 >
                     <rect width={room.width} height={room.height} fill={fill} stroke="none" />
@@ -173,7 +166,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                             width={room.width} 
                             height={room.height} 
                             onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}
-                            onTouchStart={(e, h) => onMouseDown(toMouse(e), room.id, 'room', 0, 0, h)}
+                            onTouchStart={(e, h) => onTouchStart(e, room.id, 'room', 0, 0, h)}
                          />
                       </g>
                   )}
@@ -194,7 +187,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     }}
                     onTouchStart={(e) => {
                         if (activeTool !== 'select') return;
-                        onMouseDown(toMouse(e), el.id, 'element', el.x, el.y);
+                        onTouchStart(e, el.id, 'element', el.x, el.y);
                     }}
                     style={{ cursor: activeTool === 'select' ? (isSelected ? "move" : "pointer") : "inherit" }}
                     className={activeTool === 'select' ? "hover:opacity-80" : ""}
@@ -205,7 +198,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                             width={el.width} 
                             height={el.height} 
                             onResizeStart={(e, h) => onMouseDown(e, el.id, 'element', 0, 0, h)}
-                            onTouchStart={(e, h) => onMouseDown(toMouse(e), el.id, 'element', 0, 0, h)}
+                            onTouchStart={(e, h) => onTouchStart(e, el.id, 'element', 0, 0, h)}
                         />
                       )}
                   </g>

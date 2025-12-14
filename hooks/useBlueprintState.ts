@@ -10,7 +10,7 @@ export const useBlueprintState = () => {
     const [pan, setPan] = useState({ x: 50, y: 50 });
     
     // Tool State
-    const [activeTool, setActiveTool] = useState<'select' | 'pan' | 'pen' | 'eraser'>('select');
+    const [activeTool, setActiveTool] = useState<'select' | 'pan' | 'pen' | 'eraser'>('pan');
     const [penSize, setPenSize] = useState(4);
     const [eraserSize, setEraserSize] = useState(10);
     const [currentStroke, setCurrentStroke] = useState<{x: number, y: number}[] | null>(null);

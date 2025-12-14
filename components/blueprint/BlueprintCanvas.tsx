@@ -49,9 +49,13 @@ const BlueprintCanvas: React.FC = () => {
       setLocalData(data); 
   }, [data]);
 
-  const { handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, isPanning } = useCanvasInteraction({
+  const { 
+      handleMouseDown, handleMouseMove, handleMouseUp, handleWheel, 
+      handleTouchStart, handleTouchMove, handleTouchEnd,
+      isPanning 
+  } = useCanvasInteraction({
       svgRef, containerRef, localData, setLocalData: setLocalData as any, activeFloor, scale, rotation, pan, setPan,
-      activeTool, eraserSize, penSize, setCurrentStroke, currentStroke, currentOptionIndex, viewMode
+      activeTool, eraserSize, penSize, setCurrentStroke, currentStroke, currentOptionIndex, viewMode, setScale
   });
 
   const { fitToScreen, rotateCanvas, getBounds } = useBlueprintViewport(
@@ -99,7 +103,7 @@ const BlueprintCanvas: React.FC = () => {
   };
 
   const totalFloors = localData ? Math.max(localData.floors || 0, ...localData.rooms.map(r => r.floor), 1) : 1;
-  const cursorStyle = activeTool === 'pen' ? CURSOR_PEN : activeTool === 'eraser' ? CURSOR_ERASER : isPanning ? 'grabbing' : 'default';
+  const cursorStyle = activeTool === 'pen' ? CURSOR_PEN : activeTool === 'eraser' ? CURSOR_ERASER : activeTool === 'pan' ? (isPanning ? 'grabbing' : 'grab') : 'default';
 
   return (
     <div className="flex flex-col h-full w-full bg-[#f0f0f0]">
@@ -182,6 +186,9 @@ const BlueprintCanvas: React.FC = () => {
                     onMouseMove={handleMouseMove} 
                     onMouseUp={handleMouseUp} 
                     onWheel={(e) => handleWheel(e, setScale)} 
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     selectedId={selection?.id} 
                     currentStroke={currentStroke}
                     penSize={penSize}

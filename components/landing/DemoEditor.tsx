@@ -168,6 +168,9 @@ export const DemoEditor: React.FC<DemoEditorProps> = ({ data, isLoading }) => {
                         onMouseMove={() => {}}
                         onMouseUp={() => {}}
                         onWheel={() => {}}
+                        onTouchStart={() => {}}
+                        onTouchMove={() => {}}
+                        onTouchEnd={() => {}}
                     />
                 )}
                 
