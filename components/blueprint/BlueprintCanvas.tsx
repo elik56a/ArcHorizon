@@ -185,7 +185,7 @@ const BlueprintCanvas: React.FC = () => {
                     onMouseDown={handleMouseDown} 
                     onMouseMove={handleMouseMove} 
                     onMouseUp={handleMouseUp} 
-                    onWheel={(e) => handleWheel(e, setScale)} 
+                    onWheel={handleWheel} 
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}

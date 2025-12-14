@@ -1,7 +1,9 @@
 
 import React, { useMemo } from 'react';
-import { SketchData, Room } from '../../types';
+import { SketchData } from '../../types';
 import { Layout } from 'lucide-react';
+import { getRoomBounds } from '../../services/geometry/engine/utils';
+import { getRoomStyle } from '../../config/visualStyles';
 
 interface ProjectThumbnailProps {
     data: SketchData;
@@ -22,24 +24,15 @@ export const ProjectThumbnail: React.FC<ProjectThumbnailProps> = ({ data, classN
 
         if (visibleRooms.length === 0) return { viewBox: "0 0 100 100", rooms: [] };
 
-        // Calculate Bounds
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        visibleRooms.forEach(r => {
-            if (r.x < minX) minX = r.x;
-            if (r.y < minY) minY = r.y;
-            if (r.x + r.width > maxX) maxX = r.x + r.width;
-            if (r.y + r.height > maxY) maxY = r.y + r.height;
-        });
+        // Use centralized geometry utility
+        const bounds = getRoomBounds(visibleRooms);
 
         // Add padding
         const padding = 150;
-        const width = maxX - minX;
-        const height = maxY - minY;
         
-        // Ensure square aspect ratio logic or just fit
-        // Using straight ViewBox based on bounds
+        // Ensure square aspect ratio logic or just fit using ViewBox based on bounds
         return {
-            viewBox: `${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`,
+            viewBox: `${bounds.x - padding} ${bounds.y - padding} ${bounds.w + padding * 2} ${bounds.h + padding * 2}`,
             rooms: visibleRooms
         };
     }, [data]);
@@ -51,22 +44,6 @@ export const ProjectThumbnail: React.FC<ProjectThumbnailProps> = ({ data, classN
             </div>
         );
     }
-
-    const getRoomColor = (type: string) => {
-        switch (type) {
-            case 'garden': return '#f0fdf4'; // Green-50
-            case 'pool': return '#cffafe';   // Cyan-100
-            case 'parking': return '#f3f4f6'; // Gray-100
-            case 'terrace': 
-            case 'balcony': return '#fafafa'; // Gray-50
-            default: return '#ffffff';        // White
-        }
-    };
-
-    const getStrokeColor = (type: string) => {
-        if (['garden', 'pool'].includes(type)) return 'transparent';
-        return '#1e293b'; // Slate-800
-    };
 
     return (
         <div className={`relative overflow-hidden bg-[#f0f2f5] ${className}`}>
@@ -80,43 +57,46 @@ export const ProjectThumbnail: React.FC<ProjectThumbnailProps> = ({ data, classN
                 className="w-full h-full"
                 preserveAspectRatio="xMidYMid meet"
             >
-                {rooms.map(room => (
-                    <g key={room.id}>
-                        {/* Floor */}
-                        <rect 
-                            x={room.x} 
-                            y={room.y} 
-                            width={room.width} 
-                            height={room.height} 
-                            fill={getRoomColor(room.type)}
-                            stroke="none"
-                        />
-                        {/* Walls (Simplified) */}
-                        {/* Don't draw strokes for landscape elements to keep it clean */}
-                        {!['garden', 'pool'].includes(room.type) && (
+                {rooms.map(room => {
+                    const style = getRoomStyle(room.type, 'standard', room.color);
+                    
+                    return (
+                        <g key={room.id}>
+                            {/* Floor */}
                             <rect 
                                 x={room.x} 
                                 y={room.y} 
                                 width={room.width} 
                                 height={room.height} 
-                                fill="none"
-                                stroke="#334155"
-                                strokeWidth={15} // Thicker lines for small thumbnail visibility
+                                fill={style.fill}
+                                stroke="none"
                             />
-                        )}
-                        {/* Pool Water Details */}
-                        {room.type === 'pool' && (
-                            <rect 
-                                x={room.x + 20} 
-                                y={room.y + 20} 
-                                width={room.width - 40} 
-                                height={room.height - 40} 
-                                fill="#06b6d4" 
-                                opacity={0.3}
-                            />
-                        )}
-                    </g>
-                ))}
+                            {/* Walls (Simplified) */}
+                            {style.stroke !== 'transparent' && (
+                                <rect 
+                                    x={room.x} 
+                                    y={room.y} 
+                                    width={room.width} 
+                                    height={room.height} 
+                                    fill="none"
+                                    stroke={style.stroke}
+                                    strokeWidth={15} // Thicker lines for small thumbnail visibility
+                                />
+                            )}
+                            {/* Pool Water Details */}
+                            {room.type === 'pool' && (
+                                <rect 
+                                    x={room.x + 20} 
+                                    y={room.y + 20} 
+                                    width={room.width - 40} 
+                                    height={room.height - 40} 
+                                    fill="#06b6d4" 
+                                    opacity={0.3}
+                                />
+                            )}
+                        </g>
+                    );
+                })}
             </svg>
         </div>
     );

@@ -299,11 +299,28 @@ export const useCanvasInteraction = ({
         setDragState(null); setResizeState(null); setIsPanning(false); setHasMoved(false); mouseDownPos.current = null;
     };
 
-    const handleWheel = (e: React.WheelEvent, setScale: React.Dispatch<React.SetStateAction<number>>) => {
+    const handleWheel = (e: React.WheelEvent) => {
         if (viewMode === '3d') return;
         e.preventDefault();
+        
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        
+        // Calculate mouse position relative to the container
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        setScale(s => Math.min(Math.max(s * delta, 0.1), 5));
+        const newScale = Math.min(Math.max(scale * delta, 0.1), 5);
+        
+        // Adjust Pan to keep the point under cursor stable
+        // Formula: NewPan = Mouse - (Mouse - OldPan) * (NewScale / OldScale)
+        const scaleRatio = newScale / scale;
+        const newPanX = mouseX - (mouseX - pan.x) * scaleRatio;
+        const newPanY = mouseY - (mouseY - pan.y) * scaleRatio;
+
+        setScale(newScale);
+        setPan({ x: newPanX, y: newPanY });
     };
 
     // --- TOUCH HANDLERS ---
@@ -340,14 +357,31 @@ export const useCanvasInteraction = ({
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        // Pinch Zoom Logic
+        // Pinch Zoom Logic (Zoom to Center of Pinch)
         if (e.touches.length === 2 && pinchDist) {
             const dist = Math.hypot(
                 e.touches[0].clientX - e.touches[1].clientX,
                 e.touches[0].clientY - e.touches[1].clientY
             );
+            
+            if (!containerRef.current) return;
+            const rect = containerRef.current.getBoundingClientRect();
+            
+            // Calculate center of pinch relative to container
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+            const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+
             const zoomFactor = dist / pinchDist;
-            setScale(prev => Math.min(Math.max(prev * zoomFactor, 0.1), 5));
+            const newScale = Math.min(Math.max(scale * zoomFactor, 0.1), 5);
+            
+            // Adjust Pan to keep the pinch center stable
+            const scaleRatio = newScale / scale;
+            const newPanX = midX - (midX - pan.x) * scaleRatio;
+            const newPanY = midY - (midY - pan.y) * scaleRatio;
+
+            setScale(newScale);
+            setPan({ x: newPanX, y: newPanY });
+            
             setPinchDist(dist);
             return;
         }

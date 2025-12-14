@@ -61,7 +61,7 @@ export const AppShell: React.FC = () => {
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div 
-            className="fixed inset-0 bg-black/50 z-50 md:hidden animate-fade-in"
+            className="fixed inset-0 bg-black/50 z-[1040] md:hidden animate-fade-in"
             onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -69,7 +69,7 @@ export const AppShell: React.FC = () => {
       {/* Sidebar */}
       <aside 
         className={`
-            fixed md:static inset-y-0 left-0 z-50 bg-white border-e border-gray-200 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-none
+            fixed md:static inset-y-0 left-0 z-[1050] bg-white border-e border-gray-200 flex flex-col transition-all duration-300 ease-in-out shadow-2xl md:shadow-none
             ${isMobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'}
             ${isCollapsed ? 'md:w-20' : 'md:w-64'}
         `}

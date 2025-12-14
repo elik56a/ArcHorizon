@@ -1,12 +1,13 @@
 
 import React from 'react';
-import { SketchData, Room } from '../../../types';
+import { SketchData } from '../../../types';
 import { useProjectStore } from '../../../store/useProjectStore';
 import { Render2DElement } from './Render2DElement';
 import { GRID_SIZE, ROOM_LABEL_SIZE, ROOM_SUB_LABEL_SIZE } from '../constants';
 import { GlobalDimensionChains } from './GlobalDimensionChains';
 import { GlobalWallRenderer } from './GlobalWallRenderer';
 import { ResizeHandles } from './ResizeHandles';
+import { getRoomStyle } from '../../../config/visualStyles';
 
 interface Canvas2DProps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -56,28 +57,6 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
       return `${Math.round(areaSqm)}m²`;
   };
 
-  const getRoomFill = (room: Room) => {
-      if (!isVivid) {
-          if (room.type === 'garden') return "#f0fdf4";
-          // Darker blue/gray for better visibility in blueprint mode
-          if (room.type === 'pool') return "#bae6fd"; 
-          if (room.type === 'parking') return "#e5e7eb";
-          return room.color || "white";
-      }
-      switch(room.type) {
-          case 'garden': return "#bbf7d0"; 
-          case 'pool': return "#67e8f9"; 
-          case 'parking': return "#e2e8f0"; 
-          case 'kitchen': return "#ffedd5"; 
-          case 'bathroom': return "#e0f2fe"; 
-          case 'bedroom': return "#f1f5f9"; 
-          case 'living': return "#fff7ed"; 
-          case 'corridor': return "#f8fafc";
-          case 'entry': return "#f8fafc";
-          default: return "white";
-      }
-  };
-
   // Determine which rooms should have walls drawn around them.
   const builtRooms = visibleRooms.filter(r => {
       if (r.type === 'garden' || r.type === 'pool') return false;
@@ -119,7 +98,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
 
             {/* LAYER 1: FLOORS */}
             {visibleRooms.map((room) => {
-               const fill = getRoomFill(room);
+               const style = getRoomStyle(room.type, isVivid ? 'vivid' : 'standard', room.color);
                return (
                 <g 
                     key={`floor-${room.id}`} 
@@ -134,7 +113,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                         onTouchStart(e, room.id, 'room', room.x, room.y);
                     }}
                 >
-                    <rect width={room.width} height={room.height} fill={fill} stroke="none" />
+                    <rect width={room.width} height={room.height} fill={style.fill} stroke="none" />
                 </g>
             )})}
 
