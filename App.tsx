@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import * as ReactRouterDOM from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
+import { useLanguageStore } from './store/useLanguageStore';
 
 // Pages
 import { LandingPage } from './pages/LandingPage';
@@ -11,6 +12,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
+
+const { HashRouter: Router, Routes, Route, Navigate, Outlet } = ReactRouterDOM as any;
 
 // Auth Guard Component (Protects private routes)
 const ProtectedRoute = () => {
@@ -31,22 +34,29 @@ const RootRoute = () => {
 };
 
 const App: React.FC = () => {
+  const { initialize } = useLanguageStore();
+
+  useEffect(() => {
+    // Initial sync of DOM attributes with store state
+    initialize();
+  }, []);
+
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<EditorPage />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
         {/* Protected Routes (The SaaS Shell) */}
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppShell />}>
-             <Route index element={<Navigate to="/app/dashboard" replace />} />
-             <Route path="dashboard" element={<DashboardPage />} />
-             <Route path="editor" element={<EditorPage />} />
-             <Route path="history" element={<HistoryPage />} />
-             <Route path="settings" element={<SettingsPage />} />
+            <Route index element={<Navigate to="/app/dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="editor" element={<EditorPage />} />
+            <Route path="history" element={<HistoryPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Route>
 

@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { SketchData } from '../types';
 import { getRoomBounds } from '../services/geometry/engine/utils';
 import { useProjectStore } from '../store/useProjectStore';

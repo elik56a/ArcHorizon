@@ -1,22 +1,26 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import * as ReactRouterDOM from 'react-router-dom';
 import { useProjectStore } from '../store/useProjectStore';
+import { useTranslation } from '../hooks/useTranslation';
 import { Card, Button } from '../components/common/UIComponents';
 import { Layout, Trash2, ExternalLink, Plus } from 'lucide-react';
 
+const { Link } = ReactRouterDOM as any;
+
 export const HistoryPage: React.FC = () => {
   const { savedSketches, deleteSketch, loadSketch, createNewSketch } = useProjectStore();
+  const { t } = useTranslation();
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 h-full overflow-y-auto">
        <div className="flex items-end justify-between">
          <div>
-            <h1 className="text-3xl font-bold tracking-tight mb-2">My Projects</h1>
-            <p className="text-gray-500">Manage your saved blueprints and sketches.</p>
+            <h1 className="text-3xl font-bold tracking-tight mb-2">{t('history.title')}</h1>
+            <p className="text-gray-500">{t('history.subtitle')}</p>
          </div>
          <Link to="/app/editor" onClick={createNewSketch}>
-            <Button icon={<Plus size={16}/>}>New Project</Button>
+            <Button icon={<Plus size={16}/>}>{t('dashboard.newProject')}</Button>
          </Link>
       </div>
 
@@ -28,7 +32,7 @@ export const HistoryPage: React.FC = () => {
                        <Layout size={64} className="text-gray-200" />
                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
                            <Link to="/app/editor" onClick={() => loadSketch(sketch.id)}>
-                               <Button variant="secondary" className="shadow-xl">Open Editor</Button>
+                               <Button variant="secondary" className="shadow-xl">{t('history.openEditor')}</Button>
                            </Link>
                        </div>
                   </div>
@@ -39,7 +43,7 @@ export const HistoryPage: React.FC = () => {
                           <button 
                              onClick={() => deleteSketch(sketch.id)}
                              className="text-gray-400 hover:text-red-600 transition-colors"
-                             title="Delete Project"
+                             title={t('common.delete')}
                           >
                               <Trash2 size={16} />
                           </button>
@@ -47,8 +51,8 @@ export const HistoryPage: React.FC = () => {
                       <p className="text-sm text-gray-500 line-clamp-2 h-10 mb-4">{sketch.description}</p>
                       
                       <div className="flex items-center gap-4 text-xs font-mono text-gray-400 border-t border-gray-100 pt-3 mt-auto">
-                          <span>{sketch.floors} FLOORS</span>
-                          <span>{sketch.totalAreaSqm} M²</span>
+                          <span>{sketch.floors} {t('history.floors')}</span>
+                          <span>{sketch.totalAreaSqm} {t('common.sqm')}</span>
                           <span className="ml-auto">{new Date().toLocaleDateString()}</span>
                       </div>
                   </div>

@@ -5,7 +5,11 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { LibraryPanel } from './LibraryPanel';
 import { GalleryPanel } from './GalleryPanel';
 
-const RightSidePanel: React.FC = () => {
+interface RightSidePanelProps {
+    disciplineStyle: any;
+}
+
+const RightSidePanel: React.FC<RightSidePanelProps> = ({ disciplineStyle }) => {
   const { activeRightPanel } = useUiStore();
 
   const renderContent = () => {
@@ -13,15 +17,15 @@ const RightSidePanel: React.FC = () => {
       case 'gallery':
         return <GalleryPanel />;
       case 'properties':
-        return <PropertiesPanel />;
+        return <PropertiesPanel disciplineStyle={disciplineStyle} />;
       case 'library':
       default:
-        return <LibraryPanel />;
+        return <LibraryPanel disciplineStyle={disciplineStyle} />;
     }
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-gray-200">
+    <div className="h-full flex flex-col bg-white">
         {renderContent()}
     </div>
   );

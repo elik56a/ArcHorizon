@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '../../store/useProjectStore'; 
 import { useUiStore } from '../../store/useUiStore'; 
@@ -18,7 +19,9 @@ const BlueprintCanvas: React.FC = () => {
       getCurrentSketch, isGenerating, selection, 
       currentOptionIndex, sketchOptions,
       undo, redo, history, future, currentRenderUrl, clearRender,
-      renderTrigger, updateOptionStatus
+      renderTrigger, updateOptionStatus,
+      activeLayerId, setActiveLayer, setDiscipline, toggleLayerVisibility,
+      viewStyle, setViewStyle
   } = useProjectStore();
 
   const { setGalleryOpen } = useUiStore();
@@ -106,6 +109,8 @@ const BlueprintCanvas: React.FC = () => {
               data={localData || {} as SketchData} 
               viewMode={viewMode} 
               setViewMode={setViewMode} 
+              viewStyle={viewStyle}
+              setViewStyle={setViewStyle}
               scale={scale} 
               setScale={setScale} 
               rotateCanvas={rotateCanvas} 
@@ -120,6 +125,11 @@ const BlueprintCanvas: React.FC = () => {
               setPenSize={setPenSize}
               eraserSize={eraserSize}
               setEraserSize={setEraserSize}
+              layers={localData?.layers || []}
+              activeLayerId={activeLayerId}
+              setActiveLayer={setActiveLayer}
+              setDiscipline={setDiscipline}
+              toggleLayerVisibility={toggleLayerVisibility}
           />
       )}
 

@@ -1,4 +1,6 @@
 
+import { PencilRuler, Droplets, Zap, Fan, Flame } from 'lucide-react';
+
 export const THEME = {
   // Layout
   panelBorder: "border-r border-gray-200",
@@ -29,3 +31,66 @@ export const THEME = {
     accent: '#2563eb',
   }
 };
+
+export const DISCIPLINE_STYLES = {
+    arc: { 
+        label: 'Architecture', 
+        icon: PencilRuler, 
+        color: '#0f172a', // Slate 900
+        bg: 'bg-slate-50', 
+        border: 'border-slate-200', 
+        activeBorder: 'border-slate-900', 
+        text: 'text-slate-900', 
+        highlight: 'bg-slate-900',
+        light: 'bg-slate-100',
+        selection: '#0f172a'
+    },
+    plumbing: { 
+        label: 'Plumbing', 
+        icon: Droplets, 
+        color: '#0891b2', // Cyan 600
+        bg: 'bg-cyan-50', 
+        border: 'border-cyan-200', 
+        activeBorder: 'border-cyan-600', 
+        text: 'text-cyan-700', 
+        highlight: 'bg-cyan-600',
+        light: 'bg-cyan-100',
+        selection: '#0891b2'
+    },
+    elec: { 
+        label: 'Electrical', 
+        icon: Zap, 
+        color: '#d97706', // Amber 600
+        bg: 'bg-amber-50', 
+        border: 'border-amber-200', 
+        activeBorder: 'border-amber-500', 
+        text: 'text-amber-700', 
+        highlight: 'bg-amber-500',
+        light: 'bg-amber-100',
+        selection: '#d97706'
+    },
+    hvac: { 
+        label: 'HVAC', 
+        icon: Fan, 
+        color: '#059669', // Emerald 600
+        bg: 'bg-emerald-50', 
+        border: 'border-emerald-200', 
+        activeBorder: 'border-emerald-600', 
+        text: 'text-emerald-700', 
+        highlight: 'bg-emerald-600',
+        light: 'bg-emerald-100',
+        selection: '#059669'
+    },
+    fire: { 
+        label: 'Fire Safety', 
+        icon: Flame, 
+        color: '#dc2626', // Red 600
+        bg: 'bg-red-50', 
+        border: 'border-red-200', 
+        activeBorder: 'border-red-600', 
+        text: 'text-red-700', 
+        highlight: 'bg-red-600',
+        light: 'bg-red-100',
+        selection: '#dc2626'
+    },
+} as const;

@@ -7,6 +7,7 @@ declare global {
     }
   }
 
+  // Augment global JSX namespace
   namespace JSX {
     interface IntrinsicElements {
       // Three.js primitives
@@ -55,6 +56,56 @@ declare global {
       color: any;
       
       // Catch-all to allow any valid three.js element name
+      [elemName: string]: any;
+    }
+  }
+}
+
+// Augment React's internal JSX namespace (React 18+)
+import 'react';
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      group: any;
+      mesh: any;
+      scene: any;
+      object3D: any;
+      primitive: any;
+      
+      boxGeometry: any;
+      planeGeometry: any;
+      cylinderGeometry: any;
+      sphereGeometry: any;
+      dodecahedronGeometry: any;
+      circleGeometry: any;
+      bufferGeometry: any;
+      coneGeometry: any;
+      torusGeometry: any;
+      torusKnotGeometry: any;
+      ringGeometry: any;
+
+      meshStandardMaterial: any;
+      meshPhysicalMaterial: any;
+      meshBasicMaterial: any;
+      meshPhongMaterial: any;
+      shaderMaterial: any;
+      shadowMaterial: any;
+      pointsMaterial: any;
+      lineBasicMaterial: any;
+      
+      ambientLight: any;
+      directionalLight: any;
+      pointLight: any;
+      spotLight: any;
+      hemisphereLight: any;
+      rectAreaLight: any;
+      
+      orthographicCamera: any;
+      perspectiveCamera: any;
+      
+      color: any;
+      
       [elemName: string]: any;
     }
   }

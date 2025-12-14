@@ -49,8 +49,8 @@ export const WallGenerator: React.FC<WallGeneratorProps> = ({ length, height, th
                 <mesh key={i} position={[seg.x, seg.y, 0]} castShadow receiveShadow>
                     <boxGeometry args={[seg.width, seg.height, thickness]} />
                     {isVivid 
-                        ? <meshStandardMaterial color="#f3f4f6" roughness={0.9} /> 
-                        : <meshStandardMaterial color="white" roughness={0.8} />   
+                        ? <meshStandardMaterial color="#f1f5f9" roughness={0.8} /> // Very light gray for realism
+                        : <meshStandardMaterial color="white" roughness={0.8} />   // Pure white for schematic
                     }
                 </mesh>
             ))}

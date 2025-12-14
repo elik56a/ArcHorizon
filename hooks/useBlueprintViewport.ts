@@ -1,5 +1,5 @@
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { SketchData, Room } from '../types';
 
 export const useBlueprintViewport = (

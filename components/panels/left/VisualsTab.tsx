@@ -1,9 +1,11 @@
 
 import React, { useState } from 'react';
 import { useProjectStore } from '../../../store/useProjectStore';
+import { useTranslation } from '../../../hooks/useTranslation';
 import { Image as ImageIcon, Download, Maximize2, X, Clock, Wand2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 export const VisualsTab: React.FC = () => {
+    const { t } = useTranslation();
     const { renders } = useProjectStore();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [zoom, setZoom] = useState(1);
@@ -20,9 +22,9 @@ export const VisualsTab: React.FC = () => {
             {/* Header */}
             <div className="p-4 bg-white border-b border-gray-200">
                 <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                    <ImageIcon size={16} className="text-purple-600"/> Render Gallery
+                    <ImageIcon size={16} className="text-purple-600"/> {t('gallery.title')}
                 </h2>
-                <p className="text-xs text-gray-500 mt-1">High-fidelity visualizations of your blueprints.</p>
+                <p className="text-xs text-gray-500 mt-1">{t('gallery.subtitle')}</p>
             </div>
 
             {/* List */}
@@ -30,8 +32,8 @@ export const VisualsTab: React.FC = () => {
                 {reversedRenders.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center py-10 text-gray-400">
                         <Wand2 size={48} className="mb-4 opacity-20" />
-                        <p className="text-sm font-bold">No renders yet</p>
-                        <p className="text-xs max-w-[200px] mt-2">Use the "Magic Render" button in the toolbar to create your first visualization.</p>
+                        <p className="text-sm font-bold">{t('gallery.emptyTitle')}</p>
+                        <p className="text-xs max-w-[200px] mt-2">{t('gallery.emptyDesc')}</p>
                     </div>
                 ) : (
                     reversedRenders.map((render) => (
@@ -51,7 +53,7 @@ export const VisualsTab: React.FC = () => {
                                     href={render.url} 
                                     download={`render-${render.id}.png`}
                                     className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
-                                    title="Download"
+                                    title={t('common.download')}
                                 >
                                     <Download size={14} />
                                 </a>
@@ -65,14 +67,14 @@ export const VisualsTab: React.FC = () => {
             {selectedImage && (
                 <div className="fixed inset-0 z-[200] bg-black/90 flex flex-col animate-fade-in">
                     <div className="h-16 flex items-center justify-between px-6 shrink-0 z-20 bg-black/50 backdrop-blur">
-                         <span className="text-white text-sm font-bold font-mono">FULLSCREEN PREVIEW</span>
+                         <span className="text-white text-sm font-bold font-mono">{t('gallery.fullScreen')}</span>
                          <div className="flex items-center gap-4">
                             <div className="flex items-center bg-white/10 rounded-full p-1">
-                                <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title="Zoom Out">
+                                <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title={t('editor.toolbar.zoomOut')}>
                                     <ZoomOut size={16} />
                                 </button>
                                 <span className="w-12 text-center text-xs font-mono font-bold text-white">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title="Zoom In">
+                                <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title={t('editor.toolbar.zoomIn')}>
                                     <ZoomIn size={16} />
                                 </button>
                                 <div className="w-px h-4 bg-white/20 mx-1"></div>
@@ -95,7 +97,7 @@ export const VisualsTab: React.FC = () => {
                     </div>
                     <div className="h-20 flex items-center justify-center gap-4 shrink-0 pb-6 z-20">
                         <a href={selectedImage} download="render-full.png" className="bg-white text-black px-6 py-2.5 rounded-full font-bold text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 shadow-lg">
-                            <Download size={16} /> Download Original
+                            <Download size={16} /> {t('gallery.downloadOriginal')}
                         </a>
                     </div>
                 </div>

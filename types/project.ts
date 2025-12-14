@@ -1,5 +1,6 @@
 
 import { Room, Connection, ArchitecturalElement, DrawingPath } from './blueprint';
+import { Layer } from './layer';
 
 export interface SketchData {
   id: string;
@@ -7,6 +8,11 @@ export interface SketchData {
   description: string;
   totalAreaSqm: number;
   floors: number; 
+  
+  // New Layer System
+  layers: Layer[];
+
+  // Legacy/Computed Fields (kept for backward compatibility during migration)
   rooms: Room[];
   connections: Connection[];
   elements: ArchitecturalElement[];

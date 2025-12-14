@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { ArchitecturalElement, ViewStyle } from '../../../types';
+import { useProjectStore } from '../../../store/useProjectStore';
+import { DISCIPLINE_STYLES } from '../../../theme';
 
 interface Render2DProps {
     el: ArchitecturalElement;
@@ -9,7 +11,24 @@ interface Render2DProps {
 }
 
 export const Render2DElement: React.FC<Render2DProps> = ({ el, isSelected, viewStyle }) => {
-    const stroke = isSelected ? "#2563eb" : "#000";
+    const { activeLayerId, getCurrentSketch } = useProjectStore();
+    const sketch = getCurrentSketch();
+    
+    // Find discipline color
+    let selectionColor = "#2563eb";
+    if (sketch && el.layerId) {
+        const layer = sketch.layers.find(l => l.id === el.layerId);
+        if (layer) {
+            const discipline = layer.discipline;
+            // @ts-ignore
+            if (DISCIPLINE_STYLES[discipline]) {
+                // @ts-ignore
+                selectionColor = DISCIPLINE_STYLES[discipline].selection;
+            }
+        }
+    }
+
+    const stroke = isSelected ? selectionColor : "#000";
     const strokeWidth = isSelected ? 3 : 1.5;
     const detailStroke = 1;
     const { width: w, height: h } = el;
@@ -31,7 +50,7 @@ export const Render2DElement: React.FC<Render2DProps> = ({ el, isSelected, viewS
                         <rect x={maskX} y={maskY} width={maskW} height={maskH} fill="white" stroke="none" />
                         <line x1={0} y1={0} x2={0} y2={h} stroke="#ccc" strokeWidth={1} strokeDasharray="2,2" />
                         <line x1={w} y1={0} x2={w} y2={h} stroke="#ccc" strokeWidth={1} strokeDasharray="2,2" />
-                        {isSelected && <rect x={0} y={0} width={w} height={h} fill="rgba(37, 99, 235, 0.1)" stroke="#2563eb" strokeWidth={1} strokeDasharray="4,4" />}
+                        {isSelected && <rect x={0} y={0} width={w} height={h} fill={`${selectionColor}1A`} stroke={selectionColor} strokeWidth={1} strokeDasharray="4,4" />}
                     </g>
                 );
 

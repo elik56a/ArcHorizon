@@ -1,6 +1,8 @@
+
 import React, { useState, useRef } from 'react';
 import { SketchData } from '../types';
 import { MOCK_THREE_STORY } from '../dev/mockData';
+import { useTranslation } from '../hooks/useTranslation';
 
 // Imports from new modular structure
 import { Navbar } from '../components/landing/Navbar';
@@ -10,7 +12,8 @@ import { EcosystemSection } from '../components/landing/EcosystemSection';
 import { Footer } from '../components/landing/Footer';
 
 export const LandingPage: React.FC = () => {
-  const FIXED_PROMPT = "A stunning modern villa with 3 wide floors, expansive glass walls, infinity pool, luxury garage, and fully furnished interiors.";
+  const { t } = useTranslation();
+  const FIXED_PROMPT = t('landing.hero.inputPlaceholder');
 
   const [input, setInput] = useState(FIXED_PROMPT);
   const [previewData, setPreviewData] = useState<SketchData>(MOCK_THREE_STORY);
@@ -25,9 +28,6 @@ export const LandingPage: React.FC = () => {
       setIsGenerating(true);
       setHasGenerated(true); 
       
-      // Scroll to preview area with slight delay to ensure element presence and smooth rendering
-      // This scroll-margin-top on the element (via scroll-mt-20 class in HeroSection) 
-      // plus this smooth behavior ensures it lands nicely.
       setTimeout(() => {
         if (demoSectionRef.current) {
             demoSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });

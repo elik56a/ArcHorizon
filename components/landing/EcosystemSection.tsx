@@ -1,7 +1,11 @@
+
 import React from 'react';
 import { Triangle, Building2, FileJson, HardHat, Activity, Lock, Shield } from 'lucide-react';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export const EcosystemSection: React.FC = () => {
+    const { t } = useTranslation();
+
     return (
         <section id="ecosystem" className="py-32 px-6 bg-[#050505] text-white relative overflow-hidden">
             {/* Background Effects */}
@@ -14,24 +18,24 @@ export const EcosystemSection: React.FC = () => {
                     {/* Left Column: Typography */}
                     <div className="lg:w-1/2">
                         <div className="flex items-center gap-2 text-blue-500 font-bold mb-8 uppercase tracking-widest text-xs">
-                            <Triangle size={10} fill="currentColor" /> Industry Standard
+                            <Triangle size={10} fill="currentColor" /> {t('landing.ecosystem.standard')}
                         </div>
                         
                         <h2 className="text-5xl md:text-6xl font-black tracking-tighter mb-8 leading-none">
-                            THE FUTURE OF<br/>
-                            <span className="text-gray-600">CONSTRUCTION PLANNING.</span>
+                            {t('landing.ecosystem.titleLine1')}<br/>
+                            <span className="text-gray-600">{t('landing.ecosystem.titleLine2')}</span>
                         </h2>
                         
                         <p className="text-xl text-gray-400 mb-12 leading-relaxed max-w-lg">
-                            From high-rise residential towers to luxury villas. We provide a unified system for Architects, MEP Engineers, and Security Consultants to visualize and coordinate projects from day one.
+                            {t('landing.ecosystem.desc')}
                         </p>
   
                         <div className="flex gap-6">
                             <button className="bg-white text-black px-8 py-4 rounded-lg font-bold text-sm hover:bg-gray-200 transition-colors">
-                                Start Planning
+                                {t('landing.ecosystem.startPlanning')}
                             </button>
                             <button className="border border-white/20 text-white px-8 py-4 rounded-lg font-bold text-sm hover:bg-white/10 transition-colors">
-                                View Case Studies
+                                {t('landing.ecosystem.caseStudies')}
                             </button>
                         </div>
                     </div>
@@ -49,9 +53,9 @@ export const EcosystemSection: React.FC = () => {
                                     <FileJson size={24} />
                                  </div>
                                  <div>
-                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">Architectural Visualization</h3>
+                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">{t('landing.ecosystem.archViz.title')}</h3>
                                      <p className="text-sm text-gray-500 leading-relaxed mb-4">
-                                         AI-powered sketching transforms word descriptions or uploaded files into precise 3D models. Validate massing and flow instantly.
+                                         {t('landing.ecosystem.archViz.desc')}
                                      </p>
                                  </div>
                             </div>
@@ -67,9 +71,9 @@ export const EcosystemSection: React.FC = () => {
                                     <Activity size={24} />
                                  </div>
                                  <div>
-                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">MEP Coordination</h3>
+                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">{t('landing.ecosystem.mepCoord.title')}</h3>
                                      <p className="text-sm text-gray-500 leading-relaxed">
-                                         Dedicated layers for Water and Electricity planning. Detect clashes between structural elements and utility shafts before breaking ground.
+                                         {t('landing.ecosystem.mepCoord.desc')}
                                      </p>
                                  </div>
                             </div>
@@ -85,9 +89,9 @@ export const EcosystemSection: React.FC = () => {
                                     <Lock size={24} />
                                  </div>
                                  <div>
-                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-red-400 transition-colors">Security Infrastructure</h3>
+                                     <h3 className="text-lg font-bold text-white mb-2 group-hover:text-red-400 transition-colors">{t('landing.ecosystem.security.title')}</h3>
                                      <p className="text-sm text-gray-500 leading-relaxed">
-                                         Plan access control, surveillance coverage, and perimeter security integration directly within the schematic phase.
+                                         {t('landing.ecosystem.security.desc')}
                                      </p>
                                  </div>
                             </div>

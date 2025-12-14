@@ -1,5 +1,3 @@
-
-
 import { SketchData } from '../types';
 
 // --- MOCK 1: THE GLASS PAVILION (1-STORY) ---
@@ -9,6 +7,7 @@ export const MOCK_ONE_STORY: SketchData = {
     description: 'Modern L-shaped luxury villa centered around a large swimming pool and deck area.',
     totalAreaSqm: 210,
     floors: 1,
+    layers: [],
     rooms: [
         // EXTERIOR
         { id: 'r_garden_main', name: 'Landscape', type: 'garden', floor: 1, x: -400, y: -400, width: 2500, height: 2000, floorFinish: 'grass' },
@@ -59,6 +58,7 @@ export const MOCK_TWO_STORY: SketchData = {
     description: 'Traditional 2-story family home with expansive garden views.',
     totalAreaSqm: 280,
     floors: 2,
+    layers: [],
     rooms: [
         // --- GROUND FLOOR ---
         { id: 'g_garden', name: 'Estate Garden', type: 'garden', floor: 1, x: -200, y: -200, width: 2000, height: 2000, floorFinish: 'grass' },
@@ -99,6 +99,7 @@ export const MOCK_THREE_STORY: SketchData = {
     description: 'A masterpiece of modern architecture featuring cantilevered floors, extensive glass facades, and a seamless indoor-outdoor flow.',
     totalAreaSqm: 680,
     floors: 3,
+    layers: [],
     rooms: [
         // --- FLOOR 1: SOCIAL & LANDSCAPE ---
         { id: 'f1_landscape', name: 'Estate Grounds', type: 'garden', floor: 1, x: -500, y: -500, width: 3500, height: 3000, floorFinish: 'grass' },

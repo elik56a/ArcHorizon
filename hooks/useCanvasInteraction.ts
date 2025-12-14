@@ -1,5 +1,5 @@
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { SketchData } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import { useUiStore } from '../store/useUiStore';
@@ -32,7 +32,8 @@ export const useCanvasInteraction = ({
 }: InteractionProps) => {
     
     const { 
-        setSelection, updateOptionStatus, addDrawing, deleteDrawing, deleteItem, selection
+        setSelection, updateOptionStatus, addDrawing, deleteDrawing, deleteItem, selection,
+        activeLayerId, getActiveLayerConfig
     } = useProjectStore();
     
     const { setActiveRightPanel, setPanelOpen } = useUiStore();
@@ -66,7 +67,12 @@ export const useCanvasInteraction = ({
     
         // TOOL LOGIC
         if (activeTool === 'pen') {
-            setCurrentStroke([{ x: modelPos.x, y: modelPos.y }]);
+            const config = getActiveLayerConfig();
+            if (config.editableScopes.drawings) {
+                setCurrentStroke([{ x: modelPos.x, y: modelPos.y }]);
+            } else {
+                console.warn("Drawings not allowed in this layer");
+            }
             return;
         }
         // Pan tool explicit
@@ -81,9 +87,32 @@ export const useCanvasInteraction = ({
             return; 
         }
     
+        // CHECK EDITABLE SCOPES BEFORE ALLOWING DRAG/RESIZE
+        const config = getActiveLayerConfig();
+        let isEditable = false;
+        
+        if (id && type && localData) {
+            const item = type === 'room' 
+                ? localData.rooms.find(r => r.id === id) 
+                : localData.elements.find(el => el.id === id);
+            
+            if (item) {
+                // 1. Layer Check: Can only edit items on active layer
+                if (item.layerId === activeLayerId) {
+                    // 2. Scope Check
+                    if (type === 'room') {
+                        isEditable = config.editableScopes.rooms;
+                    } else {
+                        const isOpening = ['window', 'door', 'entry_door', 'sliding_door', 'wall_opening'].includes((item as any).type);
+                        isEditable = isOpening ? config.editableScopes.openings : config.editableScopes.elements;
+                    }
+                }
+            }
+        }
+
         // SELECT TOOL INTERACTIONS
         // RESIZE START
-        if (resizeHandle && id && type && localData && activeTool === 'select') {
+        if (resizeHandle && id && type && localData && activeTool === 'select' && isEditable) {
             const item = type === 'room' ? localData.rooms.find(r => r.id === id) : localData.elements.find(el => el.id === id);
             if (item) setResizeState({ id, type, handle: resizeHandle, startMouseX: modelPos.x, startMouseY: modelPos.y, initialMsg: { x: item.x, y: item.y, width: item.width, height: item.height, rotation: (item as any).rotation || 0 } });
             return;
@@ -98,8 +127,10 @@ export const useCanvasInteraction = ({
                 setPanelOpen('right', true);
             }
             
-            // Start dragging immediately
-            setDragState({ id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y });
+            // Start dragging immediately only if editable
+            if (isEditable) {
+                setDragState({ id, type, startX: modelPos.x, startY: modelPos.y, initialX: x, initialY: y });
+            }
             return;
         } 
         // CANVAS PAN START (Fallback)
@@ -124,12 +155,14 @@ export const useCanvasInteraction = ({
     
         // ERASER DRAGGING
         if (activeTool === 'eraser' && (e.buttons === 1)) {
+            const config = getActiveLayerConfig();
             if (localData) {
                  const eraseRad = eraserSize / scale;
                  // Erase Drawings
-                 if (localData.drawings) {
+                 if (localData.drawings && config.editableScopes.drawings) {
                     const hitDrawing = localData.drawings.find(d => {
                         if (d.floor !== activeFloor) return false;
+                        if (d.layerId !== activeLayerId) return false; // Layer Guard
                         return d.points.some(p => Math.hypot(p.x - modelPos.x, p.y - modelPos.y) < eraseRad);
                     });
                     if (hitDrawing) {
@@ -139,12 +172,17 @@ export const useCanvasInteraction = ({
                  // Erase Elements
                  const hitEl = localData.elements.find(el => {
                     if (el.floor !== activeFloor) return false;
+                    if (el.layerId !== activeLayerId) return false; // Layer Guard
+                    
                     const inX = modelPos.x >= el.x && modelPos.x <= el.x + el.width;
                     const inY = modelPos.y >= el.y && modelPos.y <= el.y + el.height;
                     return inX && inY;
                  });
                  if (hitEl) { 
-                   deleteItem(hitEl.id, 'element'); 
+                   // Scope Check for Eraser
+                   const isOpening = ['window', 'door', 'entry_door', 'sliding_door', 'wall_opening'].includes(hitEl.type);
+                   const canDelete = isOpening ? config.editableScopes.openings : config.editableScopes.elements;
+                   if (canDelete) deleteItem(hitEl.id, 'element'); 
                  }
             }
             return;
@@ -199,7 +237,8 @@ export const useCanvasInteraction = ({
                     floor: activeFloor,
                     points: currentStroke,
                     strokeWidth: penSize,
-                    color: '#000000'
+                    color: '#000000',
+                    layerId: activeLayerId // Attach current active layer
                 });
             }
             setCurrentStroke(null);
@@ -208,24 +247,34 @@ export const useCanvasInteraction = ({
         
         // ERASER CLICK
         if (activeTool === 'eraser' && !hasMoved && localData) {
+            const config = getActiveLayerConfig();
             const modelPos = getModelCoordinates(e.clientX, e.clientY);
             const eraseRad = eraserSize / scale;
             
             // Drawings
-            const hitDrawing = (localData.drawings || []).find(d => {
-                 if (d.floor !== activeFloor) return false;
-                 return d.points.some(p => Math.hypot(p.x - modelPos.x, p.y - modelPos.y) < eraseRad);
-            });
-            if (hitDrawing) { deleteDrawing(hitDrawing.id); return; }
+            if (config.editableScopes.drawings) {
+                const hitDrawing = (localData.drawings || []).find(d => {
+                     if (d.floor !== activeFloor) return false;
+                     if (d.layerId !== activeLayerId) return false;
+                     return d.points.some(p => Math.hypot(p.x - modelPos.x, p.y - modelPos.y) < eraseRad);
+                });
+                if (hitDrawing) { deleteDrawing(hitDrawing.id); return; }
+            }
     
             // Elements
             const hitEl = localData.elements.find(el => {
                  if (el.floor !== activeFloor) return false;
+                 if (el.layerId !== activeLayerId) return false;
                  const inX = modelPos.x >= el.x && modelPos.x <= el.x + el.width;
                  const inY = modelPos.y >= el.y && modelPos.y <= el.y + el.height;
                  return inX && inY;
             });
-            if (hitEl) { deleteItem(hitEl.id, 'element'); return; }
+            if (hitEl) { 
+                const isOpening = ['window', 'door', 'entry_door', 'sliding_door', 'wall_opening'].includes(hitEl.type);
+                const canDelete = isOpening ? config.editableScopes.openings : config.editableScopes.elements;
+                if (canDelete) deleteItem(hitEl.id, 'element'); 
+                return; 
+            }
         }
     
         // Handle Item Clicks (Selection without moving)

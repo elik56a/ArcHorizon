@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useProjectStore } from '../../../store/useProjectStore';
 import { useUiStore } from '../../../store/useUiStore';
+import { useTranslation } from '../../../hooks/useTranslation';
 import { ImageIcon, Trash2, Download, X, Maximize2, Wand2, Clock, Sparkles, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 export const GalleryPanel: React.FC = () => {
+    const { t } = useTranslation();
     const { renders, deleteRender, triggerCanvasRender } = useProjectStore();
     const { setActiveRightPanel } = useUiStore();
     const [previewId, setPreviewId] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export const GalleryPanel: React.FC = () => {
             <div className="p-6 bg-white border-b border-gray-100 flex flex-col gap-3 shrink-0">
                 <div className="flex items-start justify-between">
                      <div className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-widest bg-gray-100 px-2 py-1 rounded">
-                        <Sparkles size={12} className="text-black" /> Visualization
+                        <Sparkles size={12} className="text-black" /> {t('editor.toolbar.render')}
                      </div>
                      <button 
                         onClick={() => setActiveRightPanel('library')} 
@@ -81,9 +83,9 @@ export const GalleryPanel: React.FC = () => {
                     </button>
                 </div>
                 <div>
-                     <h2 className="text-2xl font-black text-black leading-none tracking-tight">Gallery</h2>
+                     <h2 className="text-2xl font-black text-black leading-none tracking-tight">{t('editor.panels.gallery')}</h2>
                      <p className="text-xs text-gray-500 mt-2 leading-relaxed font-medium">
-                        We use AI to create a realistic image of the current drawing.
+                        {t('gallery.subtitle')}
                      </p>
                 </div>
             </div>
@@ -95,7 +97,7 @@ export const GalleryPanel: React.FC = () => {
                     className="w-full py-3 bg-black text-white rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-md active:scale-95 group"
                 >
                     <Wand2 size={16} className="group-hover:rotate-12 transition-transform"/> 
-                    Generate New Render
+                    {t('gallery.newRender')}
                 </button>
             </div>
 
@@ -106,8 +108,8 @@ export const GalleryPanel: React.FC = () => {
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-300">
                             <ImageIcon size={32} />
                         </div>
-                        <p className="text-sm font-bold text-gray-500">Gallery Empty</p>
-                        <p className="text-xs text-gray-400 mt-1 max-w-[180px]">Your generated images will appear here.</p>
+                        <p className="text-sm font-bold text-gray-500">{t('gallery.emptyTitle')}</p>
+                        <p className="text-xs text-gray-400 mt-1 max-w-[180px]">{t('gallery.emptyDesc')}</p>
                      </div>
                 ) : (
                     reversedRenders.map((render) => (
@@ -134,14 +136,14 @@ export const GalleryPanel: React.FC = () => {
                                         href={render.url} 
                                         download={`render-${render.id}.png`}
                                         className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-colors"
-                                        title="Download"
+                                        title={t('common.download')}
                                      >
                                          <Download size={14} />
                                      </a>
                                      <button 
                                         onClick={(e) => { e.stopPropagation(); deleteRender(render.id); }}
                                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                        title="Delete"
+                                        title={t('common.delete')}
                                      >
                                          <Trash2 size={14} />
                                      </button>
@@ -167,15 +169,15 @@ export const GalleryPanel: React.FC = () => {
                                 <div className="h-16 flex items-center justify-between px-6 shrink-0 bg-transparent border-b border-white/10 z-20">
                                      <div className="flex items-center gap-3">
                                          <ImageIcon className="text-white" size={20} />
-                                         <span className="text-white text-sm font-bold tracking-wide">FULLSCREEN PREVIEW</span>
+                                         <span className="text-white text-sm font-bold tracking-wide">{t('gallery.fullScreen')}</span>
                                      </div>
                                      <div className="flex items-center gap-4">
                                         <div className="flex items-center bg-white/10 rounded-full p-1">
-                                            <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title="Zoom Out">
+                                            <button onClick={() => setZoom(Math.max(0.5, zoom - 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title={t('editor.toolbar.zoomOut')}>
                                                 <ZoomOut size={16} />
                                             </button>
                                             <span className="w-12 text-center text-xs font-mono font-bold text-white">{Math.round(zoom * 100)}%</span>
-                                            <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title="Zoom In">
+                                            <button onClick={() => setZoom(Math.min(3, zoom + 0.25))} className="p-2 hover:bg-white/20 rounded-full text-white transition-colors" title={t('editor.toolbar.zoomIn')}>
                                                 <ZoomIn size={16} />
                                             </button>
                                             <div className="w-px h-4 bg-white/20 mx-1"></div>
@@ -191,8 +193,8 @@ export const GalleryPanel: React.FC = () => {
                                 <div className="flex-1 relative flex items-center justify-center bg-transparent overflow-hidden">
                                     {/* Navigation Arrows */}
                                     {hasPrev && (
-                                        <button onClick={handlePrev} className="absolute left-6 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-50 backdrop-blur-md shadow-lg border border-white/10">
-                                            <ChevronLeft size={32} />
+                                        <button onClick={handlePrev} className="absolute left-6 rtl:left-auto rtl:right-6 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-50 backdrop-blur-md shadow-lg border border-white/10">
+                                            <ChevronLeft size={32} className="rtl:rotate-180" />
                                         </button>
                                     )}
                                     
@@ -206,15 +208,15 @@ export const GalleryPanel: React.FC = () => {
                                     </div>
                                     
                                     {hasNext && (
-                                        <button onClick={handleNext} className="absolute right-6 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-50 backdrop-blur-md shadow-lg border border-white/10">
-                                            <ChevronRight size={32} />
+                                        <button onClick={handleNext} className="absolute right-6 rtl:right-auto rtl:left-6 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-50 backdrop-blur-md shadow-lg border border-white/10">
+                                            <ChevronRight size={32} className="rtl:rotate-180" />
                                         </button>
                                     )}
                                 </div>
                                 
                                 <div className="h-24 flex items-center justify-center gap-4 shrink-0 pb-6 bg-transparent z-20">
                                     <a href={img.url} download={`render-${img.id}.png`} className="bg-white text-black px-8 py-3 rounded-full font-bold text-sm hover:bg-gray-200 transition-colors flex items-center gap-2 shadow-xl hover:scale-105 transform">
-                                        <Download size={18} /> Download High-Res
+                                        <Download size={18} /> {t('gallery.downloadOriginal')}
                                     </a>
                                 </div>
                              </>
