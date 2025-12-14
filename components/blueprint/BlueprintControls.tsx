@@ -334,195 +334,197 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
     };
 
     return (
-        <div className="w-full h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 select-none z-[100] shrink-0 shadow-sm relative transition-all">
+        <div className="w-full h-16 bg-white border-b border-gray-200 flex items-center px-4 select-none z-[100] shrink-0 shadow-sm relative transition-all overflow-x-auto no-scrollbar">
             
-            {/* Left: Tools */}
-            <div className="flex items-center gap-2">
-                
-                {/* LAYER SWITCHER (Primary Navigation) */}
-                <LayerSwitcher 
-                    layers={layers}
-                    activeLayerId={activeLayerId}
-                    setActiveLayer={setActiveLayer}
-                    setDiscipline={setDiscipline}
-                    toggleVisibility={toggleLayerVisibility}
-                    disabled={isLoading}
-                />
-
-                {/* ADD COMPONENT BUTTON */}
-                <button
-                    onClick={handleLibraryToggle}
-                    className={`h-10 px-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold text-xs transition-all shadow-sm group mr-2 rtl:mr-0 rtl:ml-2 relative ${isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${activeRightPanel === 'library' && rightPanelOpen ? 'bg-gray-100 border-gray-300 shadow-inner' : ''}`}
-                    disabled={isLoading}
-                >
-                    <Plus size={16} className={`transition-transform duration-200 ${activeRightPanel === 'library' && rightPanelOpen ? 'rotate-45 text-black' : 'text-black'}`} />
-                    <span className="hidden xl:inline">{t('editor.panels.library')}</span>
+            <div className="flex items-center justify-between w-full min-w-max">
+                {/* Left: Tools */}
+                <div className="flex items-center gap-2">
                     
-                    {/* Tooltip */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-[200] whitespace-nowrap pointer-events-none">
-                        <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative">
-                            {t('editor.panels.library')}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
-                        </div>
-                    </div>
-                </button>
+                    {/* LAYER SWITCHER (Primary Navigation) */}
+                    <LayerSwitcher 
+                        layers={layers}
+                        activeLayerId={activeLayerId}
+                        setActiveLayer={setActiveLayer}
+                        setDiscipline={setDiscipline}
+                        toggleVisibility={toggleLayerVisibility}
+                        disabled={isLoading}
+                    />
 
-                <div className="w-px h-6 bg-gray-200 mx-1"></div>
-
-                {/* View Switcher */}
-                <div className={`flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 mr-2 rtl:mr-0 rtl:ml-2 ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    <button 
-                      onClick={() => !isLoading && setViewMode('2d')}
-                      disabled={isLoading}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewMode === '2d' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
-                    >
-                      {t('editor.toolbar.view2d')}
-                    </button>
-                    <button 
-                      onClick={() => !isLoading && setViewMode('3d')}
-                      disabled={isLoading}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewMode === '3d' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
-                    >
-                      {t('editor.toolbar.view3d')}
-                    </button>
-                </div>
-
-                {/* VISUAL STYLE TOGGLE (Only in 3D Mode) */}
-                {viewMode === '3d' && (
-                    <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 mr-2 rtl:mr-0 rtl:ml-2 animate-fade-in shrink-0">
-                        <button 
-                            onClick={() => setViewStyle('blueprint')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewStyle === 'blueprint' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-black'}`}
-                            title="Simple schematic view for editing"
-                        >
-                            <Box size={14} /> <span className="hidden md:inline">{t('editor.toolbar.schematic')}</span>
-                        </button>
-                        <button 
-                            onClick={() => setViewStyle('vivid')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewStyle === 'vivid' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
-                            title="High fidelity realistic view with shadows and details"
-                        >
-                            <Sparkles size={14} /> <span className="hidden md:inline">{t('editor.toolbar.realistic')}</span>
-                        </button>
-                    </div>
-                )}
-
-                {/* 2D TOOLS (Hidden in 3D) */}
-                {viewMode === '2d' && (
-                    <>
-                        <div className="w-px h-6 bg-gray-200 mx-1"></div>
-
-                        <div className="flex items-center gap-1">
-                            <TooltipButton onClick={() => setActiveTool('select')} icon={MousePointer2} label={t('editor.toolbar.select')} isActive={activeTool === 'select' && !toolsDisabled} disabled={toolsDisabled} />
-                            <TooltipButton onClick={() => setActiveTool('pan')} icon={Hand} label={t('editor.toolbar.pan')} isActive={activeTool === 'pan' && !toolsDisabled} disabled={toolsDisabled} />
-                        </div>
-                        
-                        <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                        
-                        <div className="flex items-center gap-2">
-                            {/* Pen Tool Group */}
-                            <div className={`flex items-center rounded-md border h-9 transition-all ${activeTool === 'pen' && !toolsDisabled ? 'border-black bg-black' : 'border-transparent bg-gray-50 hover:bg-gray-100 hover:border-gray-200'}`}>
-                                <button 
-                                    onClick={() => setActiveTool('pen')}
-                                    disabled={toolsDisabled}
-                                    className={`pl-3 pr-2 h-full flex items-center gap-2 rounded-s-md ${activeTool === 'pen' && !toolsDisabled ? 'text-white' : 'text-gray-600'} ${toolsDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                    title="Pen Tool"
-                                >
-                                    <Pen size={16} />
-                                    <span className="text-xs font-bold hidden md:inline">{t('editor.toolbar.pen')}</span>
-                                </button>
-                                <ThicknessDropdown 
-                                    value={penSize} 
-                                    onChange={setPenSize} 
-                                    isOpen={penMenuOpen} 
-                                    setIsOpen={(v) => { setPenMenuOpen(v); if(v) setEraserMenuOpen(false); }} 
-                                    disabled={toolsDisabled}
-                                    activeTool={activeTool === 'pen' && !toolsDisabled}
-                                />
-                            </div>
-
-                            {/* Eraser Tool Group */}
-                            <div className={`flex items-center rounded-md border h-9 transition-all ${activeTool === 'eraser' && !toolsDisabled ? 'border-black bg-black' : 'border-transparent bg-gray-50 hover:bg-gray-100 hover:border-gray-200'}`}>
-                                <button 
-                                    onClick={() => setActiveTool('eraser')}
-                                    disabled={toolsDisabled}
-                                    className={`pl-3 pr-2 h-full flex items-center gap-2 rounded-s-md ${activeTool === 'eraser' && !toolsDisabled ? 'text-white' : 'text-gray-600'} ${toolsDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                                    title="Eraser Tool"
-                                >
-                                    <Eraser size={16} />
-                                    <span className="text-xs font-bold hidden md:inline">{t('editor.toolbar.eraser')}</span>
-                                </button>
-                                <ThicknessDropdown 
-                                    value={eraserSize} 
-                                    onChange={setEraserSize} 
-                                    isOpen={eraserMenuOpen} 
-                                    setIsOpen={(v) => { setEraserMenuOpen(v); if(v) setPenMenuOpen(false); }} 
-                                    disabled={toolsDisabled}
-                                    activeTool={activeTool === 'eraser' && !toolsDisabled}
-                                />
-                            </div>
-                        </div>
-                    </>
-                )}
-
-                <div className="w-px h-6 bg-gray-200 mx-2"></div>
-                
-                 {/* Undo/Redo */}
-                 {history && (
-                    <div className="flex items-center gap-1">
-                         <TooltipButton onClick={history.undo} disabled={!history.canUndo || isLoading} icon={Undo} label={t('editor.toolbar.undo')} />
-                         <TooltipButton onClick={history.redo} disabled={!history.canRedo || isLoading} icon={Redo} label={t('editor.toolbar.redo')} />
-                    </div>
-                 )}
-            </div>
-
-            {/* Right: Zoom & Actions */}
-            <div className="flex items-center gap-1">
-                 <div className={`flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-100 mr-2 rtl:mr-0 rtl:ml-2 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <TooltipButton onClick={() => setScale(s => s * 0.9)} icon={ZoomOut} label={t('editor.toolbar.zoomOut')} className="h-8 w-8 p-1.5" disabled={isLoading} />
-                    <span className="text-xs font-mono font-medium w-12 text-center text-gray-500 hidden md:block">{Math.round(scale * 100)}%</span>
-                    <TooltipButton onClick={() => setScale(s => s * 1.1)} icon={ZoomIn} label={t('editor.toolbar.zoomIn')} className="h-8 w-8 p-1.5" disabled={isLoading} />
-                 </div>
-                 
-                 <TooltipButton onClick={onFit} icon={Maximize} label={t('editor.toolbar.fit')} disabled={isLoading} />
-                 <TooltipButton onClick={() => rotateCanvas('cw')} icon={RotateCw} label={t('editor.toolbar.rotate')} disabled={toolsDisabled} />
-
-                 <div className="w-px h-6 bg-gray-200 mx-2"></div>
-
-                 <TooltipButton 
-                    onClick={onRender} 
-                    icon={Wand2} 
-                    label={
-                        isRendering ? t('editor.toolbar.rendering') : 
-                        !hasContent ? t('editor.toolbar.renderHint') : 
-                        t('editor.toolbar.render')
-                    } 
-                    isActive={isRendering}
-                    disabled={renderDisabled}
-                    className={`transition-all ${isRendering ? 'bg-indigo-600 text-white animate-pulse' : 'text-indigo-600 hover:bg-indigo-50'}`}
-                 />
-
-                 <div className={`relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <button 
-                        onClick={() => setShowExportMenu(!showExportMenu)}
-                        className="bg-black text-white px-3 md:px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors ml-2 rtl:ml-0 rtl:mr-2 shadow-sm active:scale-95"
+                    {/* ADD COMPONENT BUTTON */}
+                    <button
+                        onClick={handleLibraryToggle}
+                        className={`h-10 px-3 flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-bold text-xs transition-all shadow-sm group mr-2 rtl:mr-0 rtl:ml-2 relative ${isLoading ? 'opacity-50 cursor-not-allowed' : ''} ${activeRightPanel === 'library' && rightPanelOpen ? 'bg-gray-100 border-gray-300 shadow-inner' : ''}`}
                         disabled={isLoading}
                     >
-                        <Download size={14} /> <span className="hidden md:inline">{t('editor.toolbar.export')}</span>
+                        <Plus size={16} className={`transition-transform duration-200 ${activeRightPanel === 'library' && rightPanelOpen ? 'rotate-45 text-black' : 'text-black'}`} />
+                        <span className="hidden xl:inline">{t('editor.panels.library')}</span>
+                        
+                        {/* Tooltip */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block z-[200] whitespace-nowrap pointer-events-none">
+                            <div className="bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded shadow-lg relative">
+                                {t('editor.panels.library')}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-1 border-4 border-transparent border-b-slate-900"></div>
+                            </div>
+                        </div>
                     </button>
-                    {showExportMenu && (
-                        <div className="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-lg flex flex-col min-w-[160px] overflow-hidden z-[150] animate-fade-in">
-                            <button onClick={() => { onDownload('svg'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
-                                <span className="bg-orange-100 text-orange-600 px-1 rounded text-[10px]">SVG</span> {t('editor.toolbar.svg')}
+
+                    <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+                    {/* View Switcher */}
+                    <div className={`flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 mr-2 rtl:mr-0 rtl:ml-2 ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                        <button 
+                        onClick={() => !isLoading && setViewMode('2d')}
+                        disabled={isLoading}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewMode === '2d' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                        >
+                        {t('editor.toolbar.view2d')}
+                        </button>
+                        <button 
+                        onClick={() => !isLoading && setViewMode('3d')}
+                        disabled={isLoading}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewMode === '3d' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                        >
+                        {t('editor.toolbar.view3d')}
+                        </button>
+                    </div>
+
+                    {/* VISUAL STYLE TOGGLE (Only in 3D Mode) */}
+                    {viewMode === '3d' && (
+                        <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 mr-2 rtl:mr-0 rtl:ml-2 animate-fade-in shrink-0">
+                            <button 
+                                onClick={() => setViewStyle('blueprint')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewStyle === 'blueprint' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                                title="Simple schematic view for editing"
+                            >
+                                <Box size={14} /> <span className="hidden md:inline">{t('editor.toolbar.schematic')}</span>
                             </button>
-                            <button onClick={() => { onDownload('pdf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
-                                <span className="bg-red-100 text-red-600 px-1 rounded text-[10px]">PDF</span> {t('editor.toolbar.pdf')}
-                            </button>
-                            <button onClick={() => { onDownload('dxf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold flex items-center gap-2">
-                                <span className="bg-blue-100 text-blue-600 px-1 rounded text-[10px]">DXF</span> {t('editor.toolbar.dxf')}
+                            <button 
+                                onClick={() => setViewStyle('vivid')}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${viewStyle === 'vivid' ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                                title="High fidelity realistic view with shadows and details"
+                            >
+                                <Sparkles size={14} /> <span className="hidden md:inline">{t('editor.toolbar.realistic')}</span>
                             </button>
                         </div>
                     )}
+
+                    {/* 2D TOOLS (Hidden in 3D) */}
+                    {viewMode === '2d' && (
+                        <>
+                            <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+                            <div className="flex items-center gap-1">
+                                <TooltipButton onClick={() => setActiveTool('select')} icon={MousePointer2} label={t('editor.toolbar.select')} isActive={activeTool === 'select' && !toolsDisabled} disabled={toolsDisabled} />
+                                <TooltipButton onClick={() => setActiveTool('pan')} icon={Hand} label={t('editor.toolbar.pan')} isActive={activeTool === 'pan' && !toolsDisabled} disabled={toolsDisabled} />
+                            </div>
+                            
+                            <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                            
+                            <div className="flex items-center gap-2">
+                                {/* Pen Tool Group */}
+                                <div className={`flex items-center rounded-md border h-9 transition-all ${activeTool === 'pen' && !toolsDisabled ? 'border-black bg-black' : 'border-transparent bg-gray-50 hover:bg-gray-100 hover:border-gray-200'}`}>
+                                    <button 
+                                        onClick={() => setActiveTool('pen')}
+                                        disabled={toolsDisabled}
+                                        className={`pl-3 pr-2 h-full flex items-center gap-2 rounded-s-md ${activeTool === 'pen' && !toolsDisabled ? 'text-white' : 'text-gray-600'} ${toolsDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                        title="Pen Tool"
+                                    >
+                                        <Pen size={16} />
+                                        <span className="text-xs font-bold hidden md:inline">{t('editor.toolbar.pen')}</span>
+                                    </button>
+                                    <ThicknessDropdown 
+                                        value={penSize} 
+                                        onChange={setPenSize} 
+                                        isOpen={penMenuOpen} 
+                                        setIsOpen={(v) => { setPenMenuOpen(v); if(v) setEraserMenuOpen(false); }} 
+                                        disabled={toolsDisabled}
+                                        activeTool={activeTool === 'pen' && !toolsDisabled}
+                                    />
+                                </div>
+
+                                {/* Eraser Tool Group */}
+                                <div className={`flex items-center rounded-md border h-9 transition-all ${activeTool === 'eraser' && !toolsDisabled ? 'border-black bg-black' : 'border-transparent bg-gray-50 hover:bg-gray-100 hover:border-gray-200'}`}>
+                                    <button 
+                                        onClick={() => setActiveTool('eraser')}
+                                        disabled={toolsDisabled}
+                                        className={`pl-3 pr-2 h-full flex items-center gap-2 rounded-s-md ${activeTool === 'eraser' && !toolsDisabled ? 'text-white' : 'text-gray-600'} ${toolsDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                        title="Eraser Tool"
+                                    >
+                                        <Eraser size={16} />
+                                        <span className="text-xs font-bold hidden md:inline">{t('editor.toolbar.eraser')}</span>
+                                    </button>
+                                    <ThicknessDropdown 
+                                        value={eraserSize} 
+                                        onChange={setEraserSize} 
+                                        isOpen={eraserMenuOpen} 
+                                        setIsOpen={(v) => { setEraserMenuOpen(v); if(v) setPenMenuOpen(false); }} 
+                                        disabled={toolsDisabled}
+                                        activeTool={activeTool === 'eraser' && !toolsDisabled}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="w-px h-6 bg-gray-200 mx-2"></div>
+                    
+                    {/* Undo/Redo */}
+                    {history && (
+                        <div className="flex items-center gap-1">
+                            <TooltipButton onClick={history.undo} disabled={!history.canUndo || isLoading} icon={Undo} label={t('editor.toolbar.undo')} />
+                            <TooltipButton onClick={history.redo} disabled={!history.canRedo || isLoading} icon={Redo} label={t('editor.toolbar.redo')} />
+                        </div>
+                    )}
+                </div>
+
+                {/* Right: Zoom & Actions */}
+                <div className="flex items-center gap-1 pl-4">
+                    <div className={`flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-100 mr-2 rtl:mr-0 rtl:ml-2 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <TooltipButton onClick={() => setScale(s => s * 0.9)} icon={ZoomOut} label={t('editor.toolbar.zoomOut')} className="h-8 w-8 p-1.5" disabled={isLoading} />
+                        <span className="text-xs font-mono font-medium w-12 text-center text-gray-500 hidden md:block">{Math.round(scale * 100)}%</span>
+                        <TooltipButton onClick={() => setScale(s => s * 1.1)} icon={ZoomIn} label={t('editor.toolbar.zoomIn')} className="h-8 w-8 p-1.5" disabled={isLoading} />
+                    </div>
+                    
+                    <TooltipButton onClick={onFit} icon={Maximize} label={t('editor.toolbar.fit')} disabled={isLoading} />
+                    <TooltipButton onClick={() => rotateCanvas('cw')} icon={RotateCw} label={t('editor.toolbar.rotate')} disabled={toolsDisabled} />
+
+                    <div className="w-px h-6 bg-gray-200 mx-2"></div>
+
+                    <TooltipButton 
+                        onClick={onRender} 
+                        icon={Wand2} 
+                        label={
+                            isRendering ? t('editor.toolbar.rendering') : 
+                            !hasContent ? t('editor.toolbar.renderHint') : 
+                            t('editor.toolbar.render')
+                        } 
+                        isActive={isRendering}
+                        disabled={renderDisabled}
+                        className={`transition-all ${isRendering ? 'bg-indigo-600 text-white animate-pulse' : 'text-indigo-600 hover:bg-indigo-50'}`}
+                    />
+
+                    <div className={`relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <button 
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="bg-black text-white px-3 md:px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors ml-2 rtl:ml-0 rtl:mr-2 shadow-sm active:scale-95"
+                            disabled={isLoading}
+                        >
+                            <Download size={14} /> <span className="hidden md:inline">{t('editor.toolbar.export')}</span>
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 bg-white border border-gray-200 shadow-xl rounded-lg flex flex-col min-w-[160px] overflow-hidden z-[150] animate-fade-in">
+                                <button onClick={() => { onDownload('svg'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
+                                    <span className="bg-orange-100 text-orange-600 px-1 rounded text-[10px]">SVG</span> {t('editor.toolbar.svg')}
+                                </button>
+                                <button onClick={() => { onDownload('pdf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold border-b border-gray-50 flex items-center gap-2">
+                                    <span className="bg-red-100 text-red-600 px-1 rounded text-[10px]">PDF</span> {t('editor.toolbar.pdf')}
+                                </button>
+                                <button onClick={() => { onDownload('dxf'); setShowExportMenu(false); }} className="px-4 py-3 text-start hover:bg-gray-50 text-xs font-bold flex items-center gap-2">
+                                    <span className="bg-blue-100 text-blue-600 px-1 rounded text-[10px]">DXF</span> {t('editor.toolbar.dxf')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

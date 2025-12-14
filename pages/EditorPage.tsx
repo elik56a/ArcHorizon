@@ -175,15 +175,15 @@ export const EditorPage: React.FC = () => {
         {/* Mobile Backdrop */}
         {(leftPanelOpen || rightPanelOpen) && (
             <div 
-                className="absolute inset-0 bg-black/50 z-30 md:hidden animate-fade-in" 
+                className="absolute inset-0 bg-black/50 z-[190] md:z-30 md:hidden animate-fade-in" 
                 onClick={closeMobilePanels}
             />
         )}
 
         {/* LEFT PANEL */}
         <div className={`
-            absolute md:relative inset-y-0 left-0 z-40 bg-white border-e border-gray-200 shadow-xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-            ${leftPanelOpen ? 'translate-x-0 w-[85%] md:w-[340px]' : '-translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden md:border-none'}
+            fixed md:relative inset-y-0 left-0 z-[200] md:z-40 bg-white border-e border-gray-200 shadow-xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+            ${leftPanelOpen ? 'translate-x-0 w-[80%] md:w-[340px]' : '-translate-x-full md:translate-x-0 md:w-0 md:overflow-hidden md:border-none'}
         `}>
            <ChatSidebar disciplineStyle={disciplineStyle} />
         </div>
@@ -301,8 +301,8 @@ export const EditorPage: React.FC = () => {
         {/* RIGHT PANEL - Sidebar Style */}
         {hasLoadedData && (
            <div className={`
-               absolute md:relative inset-y-0 right-0 z-40 bg-white border-s border-gray-200 shadow-xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-               ${rightPanelOpen ? 'translate-x-0 w-[85%] md:w-80' : 'translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:overflow-hidden md:border-none'}
+               fixed md:relative inset-y-0 right-0 z-[200] md:z-40 bg-white border-s border-gray-200 shadow-xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+               ${rightPanelOpen ? 'translate-x-0 w-[80%] md:w-80' : 'translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:overflow-hidden md:border-none'}
            `}>
                <RightSidePanel disciplineStyle={disciplineStyle} />
            </div>

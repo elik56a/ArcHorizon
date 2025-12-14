@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { SketchData, Room } from '../../../types';
 import { useProjectStore } from '../../../store/useProjectStore';
@@ -26,6 +27,20 @@ interface Canvas2DProps {
   activeTool?: string;
   eraserSize?: number;
 }
+
+// Helper for touch events
+const toMouse = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    return {
+        ...e,
+        clientX: t ? t.clientX : 0,
+        clientY: t ? t.clientY : 0,
+        button: 0,
+        buttons: 1,
+        preventDefault: () => e.preventDefault(),
+        stopPropagation: () => e.stopPropagation()
+    } as unknown as React.MouseEvent;
+};
 
 const Canvas2D: React.FC<Canvas2DProps> = ({
   svgRef, data, activeFloor, pan, scale, rotation, 
@@ -93,6 +108,9 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
           onWheel={onWheel}
+          onTouchStart={(e) => onMouseDown(toMouse(e))}
+          onTouchMove={(e) => onMouseMove(toMouse(e))}
+          onTouchEnd={(e) => onMouseUp({ ...e, preventDefault:()=>{}, stopPropagation:()=>{}, buttons: 0 } as any)}
         >
           <defs>
             <pattern id="grid" width={GRID_SIZE} height={GRID_SIZE} patternUnits="userSpaceOnUse">
@@ -116,6 +134,11 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                         if (activeTool !== 'select') return;
                         e.preventDefault(); 
                         onMouseDown(e, room.id, 'room', room.x, room.y); 
+                    }}
+                    onTouchStart={(e) => {
+                        if (activeTool !== 'select') return;
+                        // e.preventDefault(); // Prevent scroll?
+                        onMouseDown(toMouse(e), room.id, 'room', room.x, room.y);
                     }}
                 >
                     <rect width={room.width} height={room.height} fill={fill} stroke="none" />
@@ -146,7 +169,12 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                   </g>
                   {isSelected && activeTool === 'select' && (
                       <g transform={`translate(${room.x}, ${room.y})`}>
-                         <ResizeHandles width={room.width} height={room.height} onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}/>
+                         <ResizeHandles 
+                            width={room.width} 
+                            height={room.height} 
+                            onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}
+                            onTouchStart={(e, h) => onMouseDown(toMouse(e), room.id, 'room', 0, 0, h)}
+                         />
                       </g>
                   )}
                 </g>
@@ -164,11 +192,22 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                         e.preventDefault(); 
                         onMouseDown(e, el.id, 'element', el.x, el.y); 
                     }}
+                    onTouchStart={(e) => {
+                        if (activeTool !== 'select') return;
+                        onMouseDown(toMouse(e), el.id, 'element', el.x, el.y);
+                    }}
                     style={{ cursor: activeTool === 'select' ? (isSelected ? "move" : "pointer") : "inherit" }}
                     className={activeTool === 'select' ? "hover:opacity-80" : ""}
                   >
                       <Render2DElement el={el} isSelected={isSelected} viewStyle={viewStyle} />
-                      {isSelected && activeTool === 'select' && <ResizeHandles width={el.width} height={el.height} onResizeStart={(e, h) => onMouseDown(e, el.id, 'element', 0, 0, h)}/>}
+                      {isSelected && activeTool === 'select' && (
+                        <ResizeHandles 
+                            width={el.width} 
+                            height={el.height} 
+                            onResizeStart={(e, h) => onMouseDown(e, el.id, 'element', 0, 0, h)}
+                            onTouchStart={(e, h) => onMouseDown(toMouse(e), el.id, 'element', 0, 0, h)}
+                        />
+                      )}
                   </g>
                );
             })}

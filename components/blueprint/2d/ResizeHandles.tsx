@@ -5,9 +5,10 @@ interface ResizeHandlesProps {
     width: number;
     height: number;
     onResizeStart: (e: React.MouseEvent, handle: string) => void;
+    onTouchStart?: (e: React.TouchEvent, handle: string) => void;
 }
 
-export const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, onResizeStart }) => {
+export const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, onResizeStart, onTouchStart }) => {
     const handleSize = 15; 
     const strokeW = 2;
     const handles = [
@@ -20,7 +21,19 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({ width, height, onR
         <g>
             <rect x={0} y={0} width={width} height={height} fill="none" stroke="#2563eb" strokeWidth={strokeW} strokeDasharray="10,10" pointerEvents="none"/>
             {handles.map(h => (
-                <rect key={h.n} x={h.x - handleSize/2} y={h.y - handleSize/2} width={handleSize} height={handleSize} fill="white" stroke="#2563eb" strokeWidth={strokeW} style={{ cursor: h.c }} onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, h.n); }}/>
+                <rect 
+                    key={h.n} 
+                    x={h.x - handleSize/2} 
+                    y={h.y - handleSize/2} 
+                    width={handleSize} 
+                    height={handleSize} 
+                    fill="white" 
+                    stroke="#2563eb" 
+                    strokeWidth={strokeW} 
+                    style={{ cursor: h.c }} 
+                    onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, h.n); }}
+                    onTouchStart={(e) => { e.stopPropagation(); if(onTouchStart) onTouchStart(e, h.n); }}
+                />
             ))}
         </g>
     );
