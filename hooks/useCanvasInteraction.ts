@@ -49,6 +49,13 @@ export const useCanvasInteraction = ({
     // Pinch Zoom State
     const [pinchDist, setPinchDist] = useState<number | null>(null);
 
+    // Double Tap State for Mobile
+    const lastTapRef = useRef<number>(0);
+    const lastTapIdRef = useRef<string | null>(null);
+    
+    // Ghost Click Prevention
+    const ignoreMouseRef = useRef(false);
+
     const getModelCoordinates = (clientX: number, clientY: number) => {
         if (!containerRef.current) return { x: 0, y: 0 };
         const rect = containerRef.current.getBoundingClientRect();
@@ -64,9 +71,18 @@ export const useCanvasInteraction = ({
 
     // --- MOUSE HANDLERS ---
 
-    const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
+    const handleMouseDown = (e: React.MouseEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string, isTouch: boolean = false) => {
+        if (!isTouch && ignoreMouseRef.current) return;
+        
         if (viewMode === '3d') return; 
-        e.preventDefault(); e.stopPropagation();
+        
+        // Only prevent default if it's not a touch event (handled separately) to allow focus etc, 
+        // OR if it's an element interaction to prevent text selection.
+        if (!isTouch || id) {
+             e.preventDefault(); 
+             e.stopPropagation();
+        }
+
         setHasMoved(false);
         mouseDownPos.current = { x: e.clientX, y: e.clientY };
         const modelPos = getModelCoordinates(e.clientX, e.clientY);
@@ -128,9 +144,7 @@ export const useCanvasInteraction = ({
             // IMPROVED SELECTION: Select immediately on click for better UX
             if (id !== selection?.id) {
                 setSelection({ id, type });
-                // Automatically switch the right panel to properties
-                setActiveRightPanel('properties');
-                setPanelOpen('right', true);
+                // NOTE: We do NOT open the panel here anymore to prevent blocking the view during drag.
             }
             
             // Start dragging immediately only if editable
@@ -149,7 +163,9 @@ export const useCanvasInteraction = ({
         }
     };
 
-    const handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = (e: React.MouseEvent, isTouch: boolean = false) => {
+        if (!isTouch && ignoreMouseRef.current) return;
+        
         if (viewMode === '3d') return;
         const modelPos = getModelCoordinates(e.clientX, e.clientY);
         
@@ -234,7 +250,9 @@ export const useCanvasInteraction = ({
         }
     };
 
-    const handleMouseUp = (e: React.MouseEvent) => {
+    const handleMouseUp = (e: React.MouseEvent, isTouch: boolean = false) => {
+        if (!isTouch && ignoreMouseRef.current) return;
+
         // PEN COMMIT
         if (activeTool === 'pen' && currentStroke) {
             if (currentStroke.length > 1) {
@@ -285,13 +303,67 @@ export const useCanvasInteraction = ({
     
         // Handle Item Clicks (Selection without moving)
         if (dragState && !hasMoved && activeTool === 'select') {
-             // Logic handled in MouseDown for panel switching, but ensure panel is open
-             setPanelOpen('right', true);
-             setActiveRightPanel('properties');
+             if (isTouch) {
+                 // Mobile: Double tap to open panel
+                 const now = Date.now();
+                 const DOUBLE_TAP_DELAY = 300;
+                 if (now - lastTapRef.current < DOUBLE_TAP_DELAY && lastTapIdRef.current === dragState.id) {
+                     setPanelOpen('right', true);
+                     setActiveRightPanel('properties');
+                     lastTapRef.current = 0; // Reset
+                 } else {
+                     lastTapRef.current = now;
+                     lastTapIdRef.current = dragState.id;
+                 }
+             } else {
+                 // Desktop: Single click opens panel
+                 setPanelOpen('right', true);
+                 setActiveRightPanel('properties');
+             }
         }
         else if (hasMoved && (dragState || resizeState) && localData) {
             // Finished Drag/Resize: Commit to Store
-            updateOptionStatus(currentOptionIndex, { status: 'loaded', data: localData });
+            
+            const id = dragState?.id || resizeState?.id;
+            const type = dragState?.type || resizeState?.type;
+            
+            let finalData = localData;
+
+            // BUG FIX: Sync the modified flat items back to the layer source-of-truth 
+            // before saving, otherwise normalization (which uses layers) will revert changes.
+            if (id && type) {
+                if (type === 'room') {
+                    const flatRoom = localData.rooms.find(r => r.id === id);
+                    if (flatRoom && flatRoom.layerId) {
+                        const newLayers = localData.layers.map(layer => {
+                            if (layer.id === flatRoom.layerId) {
+                                return {
+                                    ...layer,
+                                    rooms: layer.rooms.map(r => r.id === id ? { ...r, ...flatRoom } : r)
+                                };
+                            }
+                            return layer;
+                        });
+                        finalData = { ...localData, layers: newLayers };
+                    }
+                } else {
+                    const flatElement = localData.elements.find(e => e.id === id);
+                    if (flatElement && flatElement.layerId) {
+                        const newLayers = localData.layers.map(layer => {
+                            if (layer.id === flatElement.layerId) {
+                                return {
+                                    ...layer,
+                                    elements: layer.elements.map(e => e.id === id ? { ...e, ...flatElement } : e)
+                                };
+                            }
+                            return layer;
+                        });
+                        finalData = { ...localData, layers: newLayers };
+                    }
+                }
+            }
+
+            updateOptionStatus(currentOptionIndex, { status: 'loaded', data: finalData });
             if (dragState) setSelection({ id: dragState.id, type: dragState.type });
         }
         
@@ -314,7 +386,6 @@ export const useCanvasInteraction = ({
         const newScale = Math.min(Math.max(scale * delta, 0.1), 5);
         
         // Adjust Pan to keep the point under cursor stable
-        // Formula: NewPan = Mouse - (Mouse - OldPan) * (NewScale / OldScale)
         const scaleRatio = newScale / scale;
         const newPanX = mouseX - (mouseX - pan.x) * scaleRatio;
         const newPanY = mouseY - (mouseY - pan.y) * scaleRatio;
@@ -326,6 +397,9 @@ export const useCanvasInteraction = ({
     // --- TOUCH HANDLERS ---
 
     const handleTouchStart = (e: React.TouchEvent, id?: string, type?: 'room' | 'element', x?: number, y?: number, resizeHandle?: string) => {
+        // Flag to prevent subsequent mouse events (ghost clicks)
+        ignoreMouseRef.current = true;
+
         // Multi-touch = Pinch Start
         if (e.touches.length === 2) {
             const dist = Math.hypot(
@@ -341,6 +415,12 @@ export const useCanvasInteraction = ({
 
         // Single touch = Mouse Down Logic
         if (e.touches.length === 1) {
+            if (id) {
+                // If touching an element, prevent the event from bubbling to canvas pan handler
+                // and prevent default browser actions like scroll/zoom
+                e.stopPropagation();
+            }
+
             const touch = e.touches[0];
             const fakeEvent = {
                 ...e,
@@ -352,7 +432,7 @@ export const useCanvasInteraction = ({
                 stopPropagation: () => {}
             } as unknown as React.MouseEvent;
             
-            handleMouseDown(fakeEvent, id, type, x, y, resizeHandle);
+            handleMouseDown(fakeEvent, id, type, x, y, resizeHandle, true); // Pass true for isTouch
         }
     };
 
@@ -396,12 +476,18 @@ export const useCanvasInteraction = ({
                 button: 0,
                 buttons: 1
             } as unknown as React.MouseEvent;
-            handleMouseMove(fakeEvent);
+            handleMouseMove(fakeEvent, true); // Pass true
         }
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
         setPinchDist(null);
+        
+        // IMPORTANT: Prevent ghost clicks on mobile to allow custom double-tap logic to work
+        if (e.cancelable) e.preventDefault(); 
+        
+        setTimeout(() => { ignoreMouseRef.current = false; }, 600);
+
         // Only trigger mouse up logic if we were not pinching
         // If touches drops to 0, call mouse up
         if (e.touches.length === 0) {
@@ -413,7 +499,7 @@ export const useCanvasInteraction = ({
                 button: 0,
                 buttons: 0
             } as unknown as React.MouseEvent;
-            handleMouseUp(fakeEvent);
+            handleMouseUp(fakeEvent, true); // Mark as touch event
         }
     };
 

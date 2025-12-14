@@ -110,6 +110,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     }}
                     onTouchStart={(e) => {
                         if (activeTool !== 'select') return;
+                        e.stopPropagation();
                         onTouchStart(e, room.id, 'room', room.x, room.y);
                     }}
                 >
@@ -145,7 +146,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                             width={room.width} 
                             height={room.height} 
                             onResizeStart={(e, h) => onMouseDown(e, room.id, 'room', 0, 0, h)}
-                            onTouchStart={(e, h) => onTouchStart(e, room.id, 'room', 0, 0, h)}
+                            onTouchStart={(e, h) => { e.stopPropagation(); onTouchStart(e, room.id, 'room', 0, 0, h); }}
                          />
                       </g>
                   )}
@@ -166,6 +167,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                     }}
                     onTouchStart={(e) => {
                         if (activeTool !== 'select') return;
+                        e.stopPropagation();
                         onTouchStart(e, el.id, 'element', el.x, el.y);
                     }}
                     style={{ cursor: activeTool === 'select' ? (isSelected ? "move" : "pointer") : "inherit" }}
@@ -177,7 +179,7 @@ const Canvas2D: React.FC<Canvas2DProps> = ({
                             width={el.width} 
                             height={el.height} 
                             onResizeStart={(e, h) => onMouseDown(e, el.id, 'element', 0, 0, h)}
-                            onTouchStart={(e, h) => onTouchStart(e, el.id, 'element', 0, 0, h)}
+                            onTouchStart={(e, h) => { e.stopPropagation(); onTouchStart(e, el.id, 'element', 0, 0, h); }}
                         />
                       )}
                   </g>

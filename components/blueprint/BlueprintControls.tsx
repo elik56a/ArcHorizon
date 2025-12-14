@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ZoomIn, ZoomOut, Download, Undo, Redo, Maximize, RotateCw, LucideIcon, Hand, Pen, Eraser, ChevronDown, MousePointer2, Wand2, Building2, Layers, Eye, EyeOff, Check, Box, Sparkles, Plus } from 'lucide-react';
 import { SketchData, Layer, Discipline, ViewStyle } from '../../types';
@@ -73,57 +73,80 @@ const PortalDropdown: React.FC<{
     children: React.ReactNode;
     className?: string;
 }> = ({ isOpen, onClose, anchorRef, children, className = "" }) => {
-    const [position, setPosition] = useState({ top: 0, left: 0 });
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [style, setStyle] = useState<React.CSSProperties>({ top: 0, left: 0, opacity: 0, position: 'fixed' });
 
+    // Handle click outside
     useEffect(() => {
-        const updatePosition = () => {
-            if (isOpen && anchorRef.current) {
-                const rect = anchorRef.current.getBoundingClientRect();
-                setPosition({
-                    top: rect.bottom + 8,
-                    left: rect.left
-                });
-            }
-        };
-        
+        if (!isOpen) return;
         const handleClickOutside = (event: MouseEvent) => {
             if (anchorRef.current && !anchorRef.current.contains(event.target as Node)) {
-                // We rely on the dropdown content being a portal, so checking if click is in anchor is not enough
-                // BUT, since the portal is appended to body, event.target will be inside the portal div
-                // We need a ref to the portal content ideally.
-                // However, simplistic check: if click is NOT in anchor, we close. 
-                // Wait, if click is inside the dropdown (portal), we shouldn't close.
-                // It's tricky to detect click inside portal from here without a ref to the portal container.
-                // Let's rely on the parent to handle specific logic or just close on any click that isn't the trigger
-                // For simplicity: We add a transparent backdrop or check closest.
-                
-                // Better approach: Check if target is inside a specific class we add to the portal
                 const target = event.target as HTMLElement;
                 if (!target.closest('.portal-dropdown-content') && !anchorRef.current?.contains(target)) {
                     onClose();
                 }
             }
         };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen, onClose]);
 
-        if (isOpen) {
+    // Calculate position
+    useLayoutEffect(() => {
+        if (isOpen && anchorRef.current && contentRef.current) {
+            const updatePosition = () => {
+                const anchorRect = anchorRef.current!.getBoundingClientRect();
+                const contentRect = contentRef.current!.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                
+                let top = anchorRect.bottom + 8;
+                let left = anchorRect.left; // Default LTR: Align Left Edge
+
+                // RTL Logic: Align Right Edge of menu to Right Edge of button
+                const isRTL = document.documentElement.dir === 'rtl';
+                if (isRTL) {
+                    left = anchorRect.right - contentRect.width;
+                }
+
+                // Viewport Clamping (Prevents off-screen rendering)
+                const padding = 8;
+                // Right Boundary
+                if (left + contentRect.width > viewportWidth - padding) {
+                    left = viewportWidth - contentRect.width - padding;
+                }
+                // Left Boundary
+                if (left < padding) {
+                    left = padding;
+                }
+
+                setStyle({
+                    top,
+                    left,
+                    opacity: 1,
+                    position: 'fixed'
+                });
+            };
+
+            // Initial calc
             updatePosition();
+            
             window.addEventListener('resize', updatePosition);
             window.addEventListener('scroll', updatePosition, true);
-            document.addEventListener('mousedown', handleClickOutside);
+            
+            return () => {
+                window.removeEventListener('resize', updatePosition);
+                window.removeEventListener('scroll', updatePosition, true);
+            };
         }
-        return () => {
-            window.removeEventListener('resize', updatePosition);
-            window.removeEventListener('scroll', updatePosition, true);
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
     }, [isOpen]);
 
     if (!isOpen) return null;
 
     return createPortal(
         <div 
+            ref={contentRef}
             className={`fixed z-[9999] portal-dropdown-content bg-white border border-gray-200 shadow-xl rounded-md p-1 animate-fade-in flex flex-col gap-1 ${className}`}
-            style={{ top: position.top, left: position.left }}
+            style={style}
         >
             {children}
         </div>,
